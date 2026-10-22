@@ -1,0 +1,126 @@
+/* azulejeria: the standard page chrome for a tile wall. The wall fills
+   the viewport, a title blooms over it and fades, a hint sits at the
+   foot, and a control panel sits top right with a presets tab and an
+   advanced tab. Colour it with the custom properties below. */
+:root {
+  --az-bg: #b7b0a2;                          /* behind the canvas while it loads */
+  --az-title: #f4f1e6;                       /* the title */
+  --az-whisper: rgba(244, 241, 230, 0.85);   /* the line under it */
+  --az-hint: rgba(244, 241, 230, 0.7);       /* the hint at the foot */
+  --az-glow: rgba(20, 50, 110, 0.9);         /* the title's near glow */
+  --az-glow-far: rgba(10, 30, 80, 0.9);      /* its far glow, and the whisper's */
+  --az-panel: rgba(8, 11, 18, 0.82);         /* the panel */
+  --az-card: rgba(16, 21, 31, 0.6);          /* a preset card */
+  --az-card-on: #2a3550;                     /* the chosen one, and a pressed button */
+  --az-field: #10151f;                       /* selects and buttons */
+  --az-accent: #e8c96a;                      /* slider, tab underline, values */
+  --az-accent-soft: rgba(232, 201, 106, 0.75); /* the chosen card's border */
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: var(--az-bg); }
+canvas { display: block; width: 100vw; height: 100vh; cursor: grab; touch-action: none; }
+canvas:active { cursor: grabbing; }
+
+#title {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  pointer-events: none; z-index: 10; text-align: center; padding: 1.5rem;
+  transition: opacity 3s ease;
+}
+#title.gone { opacity: 0; }
+#title h1 {
+  font-family: "Georgia", "Times New Roman", serif;
+  font-weight: 400; font-style: italic;
+  font-size: clamp(2.4rem, 7vw, 4.5rem);
+  letter-spacing: 0.06em;
+  color: var(--az-title);
+  margin: 0;
+  text-shadow: 0 0 30px var(--az-glow), 0 0 90px var(--az-glow-far);
+  opacity: 0;
+  animation: bloom 4s ease forwards 0.5s;
+}
+#whisper {
+  font-family: "Georgia", serif; font-style: italic;
+  font-size: clamp(0.9rem, 2.3vw, 1.1rem);
+  color: var(--az-whisper);
+  text-shadow: 0 0 20px var(--az-glow-far);
+  margin-top: 1.3rem; opacity: 0;
+  animation: bloom 4s ease forwards 2s;
+}
+@keyframes bloom {
+  from { opacity: 0; filter: blur(10px); transform: translateY(10px); }
+  to   { opacity: 1; filter: blur(0);    transform: translateY(0); }
+}
+
+#hint {
+  position: fixed; bottom: 1.2rem; left: 0; right: 0; text-align: center;
+  font-family: "Courier New", monospace; font-size: 0.68rem;
+  letter-spacing: 0.3em; text-transform: uppercase;
+  color: var(--az-hint); pointer-events: none; z-index: 9;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+  opacity: 0; animation: bloom 3s ease forwards 5.5s;
+}
+
+#panel {
+  position: fixed; top: 1rem; right: 1rem; z-index: 20;
+  width: 250px;
+  max-height: calc(100vh - 2rem); overflow-y: auto;
+  font-family: "Courier New", monospace; font-size: 0.72rem;
+  color: rgba(242, 234, 214, 0.85);
+  background: var(--az-panel);
+  border: 1px solid rgba(242, 234, 214, 0.15);
+  border-radius: 10px;
+  backdrop-filter: blur(8px);
+  user-select: none;
+}
+#panelHead {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.55rem 0.8rem; cursor: pointer;
+  letter-spacing: 0.18em; text-transform: uppercase; font-size: 0.66rem;
+}
+#panelBody { padding: 0 0.8rem 0.8rem; }
+#tabs { display: flex; border-top: 1px solid rgba(242, 234, 214, 0.12); border-bottom: 1px solid rgba(242, 234, 214, 0.12); }
+.tab {
+  flex: 1; padding: 0.5rem 0;
+  background: none; border: none; cursor: pointer;
+  color: rgba(242, 234, 214, 0.5);
+  font-family: inherit; font-size: 0.64rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+}
+.tab.on { color: #f2ead6; box-shadow: inset 0 -2px 0 var(--az-accent); }
+#presetsBody { padding: 0.6rem 0.55rem; display: flex; flex-direction: column; gap: 6px; }
+.card {
+  display: flex; gap: 0.6rem; align-items: center;
+  padding: 0.35rem; border-radius: 8px; cursor: pointer;
+  border: 1px solid rgba(242, 234, 214, 0.12);
+  background: var(--az-card);
+}
+.card:hover { border-color: rgba(242, 234, 214, 0.4); }
+.card.on { border-color: var(--az-accent-soft); background: var(--az-card-on); }
+.card canvas { width: 52px; height: 52px; border-radius: 6px; display: block; flex: none; }
+.card b { display: block; font-weight: normal; color: #f2ead6; font-size: 0.72rem; letter-spacing: 0.08em; }
+.card span { display: block; font-size: 0.58rem; opacity: 0.55; margin-top: 3px; letter-spacing: 0.05em; }
+#panel.closed #panelBody, #panel.closed #tabs, #panel.closed #presetsBody { display: none; }
+.row { margin-top: 0.7rem; }
+.row label { display: block; margin-bottom: 0.3rem; letter-spacing: 0.12em; opacity: 0.75; }
+.row .val { float: right; opacity: 1; color: var(--az-accent); }
+select {
+  width: 100%; padding: 0.3rem;
+  background: var(--az-field); color: inherit;
+  border: 1px solid rgba(242, 234, 214, 0.2); border-radius: 5px;
+  font-family: inherit; font-size: inherit;
+}
+input[type="range"] { width: 100%; accent-color: var(--az-accent); }
+.checks { display: flex; flex-wrap: wrap; gap: 0.45rem 0.9rem; margin-top: 0.7rem; }
+.checks label { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; opacity: 0.85; }
+input[type="checkbox"] { accent-color: var(--az-accent); }
+.btn {
+  width: 100%; margin-top: 0.8rem; padding: 0.4rem 0;
+  background: var(--az-field); color: rgba(242, 234, 214, 0.85);
+  border: 1px solid rgba(242, 234, 214, 0.2); border-radius: 5px;
+  font-family: inherit; font-size: 0.66rem; cursor: pointer;
+  letter-spacing: 0.15em; text-transform: uppercase;
+}
+.btn:active { background: var(--az-card-on); }
+#mood { font-size: 0.62rem; opacity: 0.5; margin-top: 0.45rem; letter-spacing: 0.15em; text-align: center; }

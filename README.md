@@ -1,0 +1,137 @@
+# azulejeria
+
+Tin-glazed tiles painted by rule.
+
+A seed grows a design in one square, symmetric across its diagonal. Lay
+it as a quarter of a tile and the tile carries the whole motif. Lay it as
+a whole tile and the motif only completes where four tiles meet, mirrored
+or turned, so the wall reads at a scale no single tile has. Every line is
+a polyline with a slow wobble along its normal, the way a loaded brush
+drifts. Washes are laid thin twice so the glaze pools. Each tile gets its
+own mottled glaze, a slight turn, a slight shift, and a few of them craze.
+
+This package is the engine. You bring the motifs, the palettes and the
+presets. Two walls built on it: [Azulejería](https://stepinto.dev/art/azulejeria.html)
+(Talavera rosettes and Mudéjar strapwork) and [Jerez](https://stepinto.dev/art/jerez.html)
+(vines, horses and sherry). The design is written up
+[here](https://stepinto.dev/posts/tiles-painted-by-rule/).
+
+```
+npm install azulejeria
+```
+
+No dependencies. ES module. Browser only (it paints on canvas).
+
+## A wall in forty lines
+
+```html
+<link rel="stylesheet" href="node_modules/azulejeria/src/azulejeria.css">
+<canvas id="c"></canvas>
+<script type="module">
+import { createWall, mountPanel, PAINTERS, arcPts, ink } from 'azulejeria';
+
+const palettes = {
+  // glaze: the tin white. tint: the mottle in it. ink: the trace line.
+  // wash: the main fill. accents: other glazes. grout: between tiles.
+  talavera: { glaze: '#f3f1ea', tint: '#e2e5de', ink: '#1b3a7e', wash: '#2b5cab', accents: [], grout: '#b6b0a2' },
+};
+
+const motifs = {
+  // grows a list of elements from a seeded context; each element names
+  // a painter and carries its parameters. Corner (0,0) is the main
+  // corner, (1,1) the far one, the edge midpoints are shared with the
+  // neighbouring tile.
+  rosette({ rng, density, bands, bold, pick, role, dots }) {
+    const els = [{ t: 'fan', n: 2 + Math.floor(rng() * 3), r: (0.3 + rng() * 0.1) * bold, ...role() }];
+    if (bands) els.push({ t: 'band', kind: pick(['circle', 'diamond']), w: 0.04, ...role() });
+    if (density >= 4) els.push({ t: 'ring', r: 0.5 * bold, lobes: 7 });
+    if (density >= 5) els.push(dots(3, 4, 0.55, 0.4, 0.85));
+    return els;
+  },
+};
+
+const painters = {
+  ...PAINTERS,                    // band, ring, lattice, dots
+  fan(el, b) {                    // petals out from the main corner
+    for (let k = 0; k < el.n; k++) b.petal(0, 0, (k + 0.5) * b.Q / el.n, 0.08, el.r, 0.7, b.col);
+    ink(b.g, arcPts(0, 0, 0.06, 0, b.Q, b.amp, b.rng), b.lw, b.pal, b.rng, false);
+  },
+};
+
+const presets = {
+  talavera: { seed: 71, repeat: 'module', pal: 'talavera', motif: 'rosette', density: 4, hand: 0.5, brush: 1, scale: 120, bands: true, age: false },
+};
+
+const wall = createWall(document.getElementById('c'), { palettes, motifs, painters, presets });
+mountPanel(wall, { fileName: 'wall', defaultPreset: 'talavera' });
+</script>
+```
+
+`mountPanel` is optional. Without it, `createWall` still fills the canvas,
+pans on drag, zooms on pinch or wheel, and paints a new design on a double
+tap. Drive it from your own controls through `wall.state` and
+`wall.rebuild(true)`.
+
+## The parts
+
+**`createWall(canvas, { palettes, motifs, painters, presets })`** returns
+the wall. `wall.state` holds `seed`, `repeat` (`module`, `rotate`,
+`single` or `checker`), `pal`, `motif`, `density` (1 to 5), `hand` (0 to
+1, how far the brush drifts), `brush` (line weight), `scale` (pixels per
+tile), `panX`, `panY`, `bands`, `grout` and `age`. After changing any of
+them call `wall.rebuild(true)` to repaint the tiles, or `wall.rebuild(false)`
+for things the wall draws itself (pan, grout, age). `wall.applyPreset(name)`,
+`wall.newDesign()` and `wall.zoomAt(x, y, factor)` do what they say. Set
+`wall.onChange(kind)` to be told about them.
+
+**`mountPanel(wall, { fileName, defaultPreset })`** wires the standard
+panel, which is a handful of elements found by id: selects `repeat`,
+`motif` and `palette`; ranges `density`, `hand`, `brush` and `zoom` with
+`densityVal`, `handVal`, `brushVal` and `zoomVal` spans beside them;
+checkboxes `bands`, `grout` and `age`; buttons `newDesign` and `save`;
+a `mood` line for the seed; `.card[data-preset]` cards each holding a
+canvas for a thumbnail; `.tab[data-tab]` buttons switching `presetsBody`
+and `panelBody`; `panel` with `panelHead` and `panelToggle`; and a `title`
+overlay that fades on first touch. Anything missing is skipped. It also
+reads the query string, so `?preset=talavera` or
+`?seed=4242&repeat=rotate&pal=talavera&motif=rosette&density=5&age=1` is a
+shareable wall. Copy the markup from either of the two pages above.
+
+**`azulejeria.css`** styles that markup. Colour it with the custom
+properties at the top of the file: `--az-bg`, `--az-title`,
+`--az-whisper`, `--az-hint`, `--az-glow`, `--az-glow-far`, `--az-panel`,
+`--az-card`, `--az-card-on`, `--az-field`, `--az-accent` and
+`--az-accent-soft`.
+
+**A motif** is `(ctx) => elements`. The context has `rng` (seeded, so the
+same seed always grows the same design), `density`, `bands`, `bold`
+(1.35 when the design fills a whole tile, so the motif can be drawn
+larger), `pick(list)`, `role()` (wash, or one of the accents, as the
+palette allows) and `dots(kMin, kSpan, x0, xSpan, yk)` for the scatter
+that the highest density adds. Read the rng in the same order every time
+and the design is reproducible.
+
+**A painter** is `(el, b) => void`. `b` is the brush for the design:
+`g` (a 2D context scaled to the unit square), `pal`, `lw`, `amp`, `rng`,
+`col` (the element's role resolved to a colour), `Q` (a quarter turn),
+`D` (the diagonal) with `dc` and `ds`, and the strokes `shape(pts, col)`
+(wash then ink), `dot(x, y, r, col, alpha)`, `petal(cx, cy, ang, rIn, rOut, wd, col)`,
+`kite(...)` (the same with straight sides), `lobes(cx, cy, r, a0, a1, n)`
+and `altOf(el)` (the next accent along). The geometry helpers are
+exported too: `arcPts`, `linePts`, `petalPts`, `kitePts`, `strapPts`,
+`polyPts`, each taking the wobble amplitude and rng, and `trace`, `ink`,
+`wash` to put them on the canvas.
+
+**The four painters that ship** are `band` (a quarter circle or straight
+edge across the far corner, which four tiles close into a ring or a
+diamond), `ring` (a scalloped ring around the main corner), `lattice` (a
+line edge to edge that mirrors into a lozenge net) and `dots`.
+
+**The lower level** is there if you want it: `makeDesign(seed, density,
+bands, bold, motif)`, `paintDesign(g, els, pal, hand, lw, seed, painters)`,
+`makeTile(opts, size, pixelRatio, seed)`, `tileOpts(cfg, state)` and
+`paintThumb(cfg, preset, g, size, pixelRatio)`.
+
+## Licence
+
+MIT.
