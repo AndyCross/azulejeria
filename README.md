@@ -15,8 +15,12 @@ presets, and, if the tile is not glazed, a material. Three walls built on
 it: [Azulejería](https://stepinto.dev/art/azulejeria.html) (Talavera
 rosettes and Mudéjar strapwork), [Jerez](https://stepinto.dev/art/jerez.html)
 (vines, horses and sherry) and [Hidráulico](https://stepinto.dev/art/hidraulico.html)
-(pigmented cement, pressed rather than painted). The design is written up
-[here](https://stepinto.dev/posts/tiles-painted-by-rule/).
+(pigmented cement, pressed rather than painted). Underneath the wall is a
+viewer, a canvas you paint any world into, with the drag, the pinch, the
+wheel and the page chrome; [Alicatado](https://stepinto.dev/art/alicatado.html)
+(cut tile set in lime) is the viewer with its own paint. The design is
+written up [here](https://stepinto.dev/posts/tiles-painted-by-rule/) and
+[here](https://stepinto.dev/posts/cut-tile-and-poured-cement/).
 
 ```
 npm install azulejeria
@@ -105,7 +109,8 @@ W, H, state, pal)` is drawn over the whole wall last. None of the hooks
 read the design's rng, so a material never moves a design.
 
 **`mountPanel(wall, { fileName, defaultPreset })`** wires the standard
-panel, which is a handful of elements found by id: selects `repeat`,
+panel for a wall. It is `mountChrome` (below) with the wall's controls,
+which are a handful of elements found by id: selects `repeat`,
 `motif` and `palette`; ranges `density`, `hand`, `brush` and `zoom` with
 `densityVal`, `handVal`, `brushVal` and `zoomVal` spans beside them;
 checkboxes `bands`, `grout` and `age`; buttons `newDesign` and `save`;
@@ -116,6 +121,31 @@ overlay that fades on first touch. Anything missing is skipped. It also
 reads the query string, so `?preset=talavera` or
 `?seed=4242&repeat=rotate&pal=talavera&motif=rosette&density=5&age=1` is a
 shareable wall. Copy the markup from either of the two pages above.
+
+**`createViewer(canvas, { paint, scale, minZoom, maxZoom, margin })`**
+is what a wall is built on, and what any other world can be. `paint(g,
+state, w, h, dpr, ox, oy)` paints the world into `g`, `w` by `h` css
+pixels at `dpr`, with the world's origin at `(ox, oy)`. The viewer fills
+the window, pans on drag, zooms on pinch or wheel, and calls
+`onDoubleTap()` on a double tap. With a `margin` it paints into a buffer
+that much larger than the window and only blits while you drag, which is
+what a slow paint wants. `viewer.state` has `scale`, `panX` and `panY`;
+add your own fields to it. Call `viewer.repaint()` when the world
+changes and `viewer.moved()` when only the pan did.
+
+**`mountChrome(viewer, spec)`** wires the same chrome around any viewer:
+the panel, the tabs, the preset cards, the title that fades, the save
+button, the query string. The spec names the presets, `applyPreset(name)`,
+`thumb(ctx, settings)` to paint a card, and the `controls`: a list of
+`{ id, key, q, kind, fmt, valId, keep, change }`, where `kind` is
+`select`, `range` or `check`, `key` is the field of `viewer.state` (the
+id by default), `q` its name in the query string (the key by default),
+`fmt` renders a range's value beside it, `keep` leaves the preset marked
+when the query string sets it, and `change(value)` is what to do after.
+Then `newId` and `onNew` for the button that starts over, `mood(state)`
+for the line under it, `query(q)` for anything else in the query string,
+`fileName` and `suffix(state)` for the saved png, and `ready()` once
+everything is applied. Alicatado is the worked example.
 
 **`azulejeria.css`** styles that markup. Colour it with the custom
 properties at the top of the file: `--az-bg`, `--az-title`,

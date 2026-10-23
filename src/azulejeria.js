@@ -9,10 +9,12 @@
 // This module is the engine: the seeded random, the brushwork (every
 // line a polyline with a slow wobble along its normal, washes laid
 // thin twice so the glaze pools), the tile (mottled glaze, the design
-// laid once or four times), the wall (tiles repeated with a symmetry,
-// each turned and shifted a little, some crazed) and the standard
-// control panel. Motifs, palettes and presets belong to the page that
-// uses it. See README.md for the shape of each.
+// laid once or four times), the viewer (a canvas you paint a world
+// into, with drag, pinch, wheel and the double tap), the wall (a
+// viewer painting tiles repeated with a symmetry, each turned and
+// shifted a little, some crazed) and the standard chrome. Motifs,
+// palettes and presets belong to the page that uses it. See README.md
+// for the shape of each.
 //
 // A material, optionally, changes what the tile is made of without
 // touching what is drawn on it: how the ground is laid, how a shape
@@ -342,10 +344,133 @@ export function paintThumb(cfg, p, g, T, k) {
   }
 }
 
+// ------------------------------------------------------------- viewer ---
+// createViewer(canvas, { paint, scale, minZoom, maxZoom, margin }) is
+// a canvas you paint a world into. It fills the window, and handles
+// drag, pinch, wheel and the double tap. `paint(g, state, w, h, dpr,
+// ox, oy)` paints the world into g, w by h css pixels at dpr, with
+// the world's origin at (ox, oy). With a `margin` the world is painted
+// into a buffer that much larger than the window and only blitted
+// while you drag, which is what a slow paint wants; without one it is
+// painted straight to the canvas every time. `state` carries `scale`,
+// `panX` and `panY`, plus whatever the page adds. Call `repaint()`
+// when the world changes and `moved()` when only the pan did. Set
+// `onChange(kind)` to hear 'zoom', `onInteract()` to hear the first
+// touch, `onDoubleTap()` for the double tap and `onZoom()` for the end
+// of a zoom.
+export function createViewer(canvas, opts) {
+  opts = opts || {};
+  const ctx = canvas.getContext('2d');
+  const DPR = Math.min(window.devicePixelRatio || 1, 2);
+  const state = { scale: opts.scale || 120, panX: 0, panY: 0 };
+  const viewer = { canvas, ctx, state, W: 0, H: 0, DPR, paint: opts.paint,
+                   minZoom: opts.minZoom || 40, maxZoom: opts.maxZoom || 260, margin: opts.margin || 0,
+                   preset: '', onChange: null, onInteract: null, onDoubleTap: null, onZoom: null };
+  let dirty = true, needPaint = true, buf = null, bg = null, bufPan = null;
+
+  function render() {
+    const W = viewer.W, H = viewer.H, M = viewer.margin;
+    if (!M) { viewer.paint(ctx, state, W, H, DPR, W / 2 + state.panX, H / 2 + state.panY); return; }
+    if (needPaint || !bufPan) {
+      if (!buf) { buf = document.createElement('canvas'); bg = buf.getContext('2d'); }
+      buf.width = Math.ceil((W + 2 * M) * DPR); buf.height = Math.ceil((H + 2 * M) * DPR);
+      viewer.paint(bg, state, W + 2 * M, H + 2 * M, DPR, W / 2 + M + state.panX, H / 2 + M + state.panY);
+      bufPan = [state.panX, state.panY];
+      needPaint = false;
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(buf, (state.panX - bufPan[0] - M) * DPR, (state.panY - bufPan[1] - M) * DPR);
+  }
+  function repaint() { needPaint = true; dirty = true; }
+  function moved() {
+    const M = viewer.margin;
+    if (M && bufPan && (Math.abs(state.panX - bufPan[0]) > M * 0.9 || Math.abs(state.panY - bufPan[1]) > M * 0.9)) needPaint = true;
+    dirty = true;
+  }
+  function frame() {
+    if (dirty) { dirty = false; render(); }
+    requestAnimationFrame(frame);
+  }
+  function resize() {
+    viewer.W = window.innerWidth; viewer.H = window.innerHeight;
+    canvas.width = Math.round(viewer.W * DPR); canvas.height = Math.round(viewer.H * DPR);
+    repaint();
+  }
+  window.addEventListener('resize', resize);
+
+  const changed = kind => { if (viewer.onChange) viewer.onChange(kind); };
+
+  function zoomAt(sx, sy, factor) {
+    const next = Math.max(viewer.minZoom, Math.min(viewer.maxZoom, state.scale * factor));
+    factor = next / state.scale;
+    // keep the world point under (sx, sy) fixed while the scale changes
+    state.panX = sx - viewer.W / 2 - (sx - viewer.W / 2 - state.panX) * factor;
+    state.panY = sy - viewer.H / 2 - (sy - viewer.H / 2 - state.panY) * factor;
+    state.scale = next;
+    repaint();
+    if (viewer.onZoom) viewer.onZoom();
+    changed('zoom');
+  }
+
+  // drag to pan, pinch or wheel to zoom, double-tap for whatever the page wants
+  const pointers = new Map();
+  let pinchDist = 0, pinchMid = null, lastTap = 0, lastTapX = 0, lastTapY = 0;
+
+  canvas.addEventListener('pointerdown', e => {
+    canvas.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pointers.size === 1) {
+      const now = performance.now();
+      if (now - lastTap < 320 && Math.hypot(e.clientX - lastTapX, e.clientY - lastTapY) < 40) {
+        if (viewer.onDoubleTap) viewer.onDoubleTap();
+        lastTap = 0;
+      } else { lastTap = now; lastTapX = e.clientX; lastTapY = e.clientY; }
+    } else if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      pinchDist = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      pinchMid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    }
+    if (viewer.onInteract) viewer.onInteract();
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!pointers.has(e.pointerId)) return;
+    const prev = pointers.get(e.pointerId);
+    pointers.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pointers.size === 1) {
+      state.panX += e.clientX - prev[0];
+      state.panY += e.clientY - prev[1];
+      moved();
+    } else if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      const dist = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      if (pinchMid) { state.panX += mid[0] - pinchMid[0]; state.panY += mid[1] - pinchMid[1]; }
+      if (pinchDist > 0) zoomAt(mid[0], mid[1], dist / pinchDist);
+      else moved();
+      pinchDist = dist; pinchMid = mid;
+    }
+  });
+  const endPointer = e => {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) { pinchDist = 0; pinchMid = null; }
+  };
+  canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('pointercancel', endPointer);
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.08 : 1 / 1.08);
+  }, { passive: false });
+
+  Object.assign(viewer, { render, repaint, moved, zoomAt, resize });
+  resize();
+  requestAnimationFrame(frame);
+  return viewer;
+}
+
 // --------------------------------------------------------------- wall ---
-// createWall(canvas, { palettes, motifs, painters, presets }) paints a
-// wall that fills the canvas, and handles drag, pinch, wheel and the
-// double tap. It returns the wall: `state` to read or change, then
+// createWall(canvas, { palettes, motifs, painters, presets, material })
+// is a viewer that paints a wall of tiles. It returns the wall, which
+// is the viewer with more on it: `state` to read or change, then
 // `rebuild(true)` to repaint the tiles or `rebuild(false)` to redraw
 // the wall with the tiles it has. `applyPreset(name)`, `newDesign()`
 // and `zoomAt(x, y, factor)` do the usual things. Set `onChange(kind)`
@@ -356,8 +481,6 @@ export function paintThumb(cfg, p, g, T, k) {
 // `age(ctx, t)` (what age does to one tile, drawn over it in the
 // tile's own frame) and `finish(ctx, W, H, state, pal)` (over the wall).
 export function createWall(canvas, cfg) {
-  const ctx = canvas.getContext('2d');
-  const DPR = Math.min(window.devicePixelRatio || 1, 2);
   const palettes = cfg.palettes, motifs = cfg.motifs, presets = cfg.presets || {};
   const painters = cfg.painters || PAINTERS;
   const material = cfg.material || null, m = material || {};
@@ -365,7 +488,8 @@ export function createWall(canvas, cfg) {
   const firstMotif = Object.keys(motifs)[0];
   for (const p of Object.values(presets)) if (!p.motif) p.motif = firstMotif;
 
-  const state = {
+  const wall = createViewer(canvas, { paint, scale: 120, minZoom: 40, maxZoom: 260 });
+  const state = Object.assign(wall.state, {
     seed: 1,
     repeat: 'module',   // module | rotate | single | checker
     pal: Object.keys(palettes)[0],
@@ -373,16 +497,15 @@ export function createWall(canvas, cfg) {
     density: 3,         // how much of the design is drawn, 1..5
     hand: 0.5,          // wobble of the brush
     brush: 1,           // line weight
-    scale: 120,         // pixels per tile
-    panX: 0, panY: 0,
     bands: true,
     grout: true,
     age: false,
-  };
-  const wall = { canvas, ctx, state, palettes, motifs, painters, material, presets, preset: '', W: 0, H: 0, onChange: null, onInteract: null };
+  });
+  Object.assign(wall, { palettes, motifs, painters, material, presets });
   const tcfg = { palettes, motifs, painters, material };
+  const DPR = wall.DPR;
 
-  let tiles = { A: [], B: [] }, needTiles = true, dirty = true;
+  let tiles = { A: [], B: [] }, needTiles = true;
 
   function buildTiles() {
     const o = tileOpts(tcfg, state);
@@ -394,18 +517,15 @@ export function createWall(canvas, cfg) {
     needTiles = false;
   }
 
-  function render() {
+  function paint(ctx, st, W, H, dpr, ox, oy) {
     if (needTiles) buildTiles();
     const pal = palettes[state.pal];
-    const W = wall.W, H = wall.H;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = pal.grout;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.fillRect(0, 0, W, H);
 
     const S = state.scale;
     const gap = state.grout ? (m.gapOf ? m.gapOf(S, state) : Math.max(1.2, S * 0.022)) : 0;
-    const ox = W / 2 + state.panX, oy = H / 2 + state.panY;
     const i0 = Math.floor(-ox / S) - 1, i1 = Math.ceil((W - ox) / S) + 1;
     const j0 = Math.floor(-oy / S) - 1, j1 = Math.ceil((H - oy) / S) + 1;
     const s = S - gap;
@@ -459,20 +579,7 @@ export function createWall(canvas, cfg) {
     }
   }
 
-  function rebuild(rebuildTiles) { if (rebuildTiles) needTiles = true; dirty = true; }
-  function frame() {
-    if (dirty) { dirty = false; render(); }
-    requestAnimationFrame(frame);
-  }
-  function resize() {
-    wall.W = window.innerWidth; wall.H = window.innerHeight;
-    canvas.width = Math.round(wall.W * DPR); canvas.height = Math.round(wall.H * DPR);
-    rebuild(false);
-  }
-  window.addEventListener('resize', resize);
-  resize();
-  requestAnimationFrame(frame);
-
+  function rebuild(rebuildTiles) { if (rebuildTiles) needTiles = true; wall.repaint(); }
   const changed = kind => { if (wall.onChange) wall.onChange(kind); };
 
   function applyPreset(name) {
@@ -491,118 +598,70 @@ export function createWall(canvas, cfg) {
     rebuild(true);
     changed('design');
   }
+  // tiles are cached at a pixel size: repaint them once the zoom settles
+  let zoomTimer = 0;
+  wall.onZoom = () => { clearTimeout(zoomTimer); zoomTimer = setTimeout(() => rebuild(true), 160); };
+  wall.onDoubleTap = newDesign;
 
-  // drag to pan, pinch or wheel to zoom, double-tap for a new design
-  const pointers = new Map();
-  let pinchDist = 0, pinchMid = null, lastTap = 0, lastTapX = 0, lastTapY = 0, zoomTimer = 0;
-
-  function zoomAt(sx, sy, factor) {
-    const next = Math.max(40, Math.min(260, state.scale * factor));
-    factor = next / state.scale;
-    state.panX = sx - wall.W / 2 - (sx - wall.W / 2 - state.panX) * factor;
-    state.panY = sy - wall.H / 2 - (sy - wall.H / 2 - state.panY) * factor;
-    state.scale = next;
-    // tiles are cached at a pixel size: repaint them once the zoom settles
-    clearTimeout(zoomTimer);
-    zoomTimer = setTimeout(() => rebuild(true), 160);
-    rebuild(false);
-    changed('zoom');
-  }
-
-  canvas.addEventListener('pointerdown', e => {
-    canvas.setPointerCapture(e.pointerId);
-    pointers.set(e.pointerId, [e.clientX, e.clientY]);
-    if (pointers.size === 1) {
-      const now = performance.now();
-      if (now - lastTap < 320 && Math.hypot(e.clientX - lastTapX, e.clientY - lastTapY) < 40) {
-        newDesign();
-        lastTap = 0;
-      } else { lastTap = now; lastTapX = e.clientX; lastTapY = e.clientY; }
-    } else if (pointers.size === 2) {
-      const [a, b] = [...pointers.values()];
-      pinchDist = Math.hypot(a[0] - b[0], a[1] - b[1]);
-      pinchMid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-    }
-    if (wall.onInteract) wall.onInteract();
-  });
-  canvas.addEventListener('pointermove', e => {
-    if (!pointers.has(e.pointerId)) return;
-    const prev = pointers.get(e.pointerId);
-    pointers.set(e.pointerId, [e.clientX, e.clientY]);
-    if (pointers.size === 1) {
-      state.panX += e.clientX - prev[0];
-      state.panY += e.clientY - prev[1];
-      rebuild(false);
-    } else if (pointers.size === 2) {
-      const [a, b] = [...pointers.values()];
-      const dist = Math.hypot(a[0] - b[0], a[1] - b[1]);
-      const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-      if (pinchMid) { state.panX += mid[0] - pinchMid[0]; state.panY += mid[1] - pinchMid[1]; }
-      if (pinchDist > 0) zoomAt(mid[0], mid[1], dist / pinchDist);
-      else rebuild(false);
-      pinchDist = dist; pinchMid = mid;
-    }
-  });
-  const endPointer = e => {
-    pointers.delete(e.pointerId);
-    if (pointers.size < 2) { pinchDist = 0; pinchMid = null; }
-  };
-  canvas.addEventListener('pointerup', endPointer);
-  canvas.addEventListener('pointercancel', endPointer);
-  canvas.addEventListener('wheel', e => {
-    e.preventDefault();
-    zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.08 : 1 / 1.08);
-  }, { passive: false });
-
-  Object.assign(wall, { rebuild, render, applyPreset, newDesign, zoomAt, resize, DPR });
+  Object.assign(wall, { rebuild, applyPreset, newDesign });
+  wall.rebuild(false);
   return wall;
 }
 
-// -------------------------------------------------------------- panel ---
-// mountPanel(wall, { fileName, defaultPreset }) wires the standard
-// control panel: the elements with the ids repeat, motif, palette,
-// density, hand, brush, zoom, bands, grout, age, newDesign, mood,
-// save, panel, panelHead, panelToggle, presetsBody, panelBody, the
-// `.tab` buttons, the `.card[data-preset]` cards (each with a canvas
-// for its thumbnail) and the `#title` overlay. It reads the query
-// string (?preset=, ?seed=, ?repeat=, ?pal=, ?motif=, ?density=,
-// ?hand=, ?zoom=, ?bands=0, ?age=1) and applies it. Anything missing
-// from the page is skipped.
-export function mountPanel(wall, opts) {
-  opts = opts || {};
-  const doc = opts.document || document;
+// ------------------------------------------------------------- chrome ---
+// mountChrome(viewer, spec) wires the standard page chrome around any
+// viewer: the `#panel` with `#panelHead` and `#panelToggle`, the `.tab`
+// buttons switching `#presetsBody` and `#panelBody`, the
+// `.card[data-preset]` cards (each holding a canvas for its thumbnail),
+// the `#title` overlay that fades on first touch, the `#save` button,
+// the `#mood` line, and the controls the spec lists. It reads the
+// query string and applies it. Anything missing from the page is
+// skipped.
+//
+// The spec: `presets` (name -> settings), `applyPreset(name)`,
+// `thumb(ctx, settings)` to paint a 52px card, `controls`, a list of
+// `{ id, key, q, kind, fmt, valId, keep, change }`: `kind` is 'select',
+// 'range' or 'check'; `key` is the field of `viewer.state` (the id by
+// default); `q` is its name in the query string (the key by default);
+// `fmt` renders the value beside a range; `valId` is where
+// (`<id>Val` by default); `keep` leaves the preset marked when the
+// query string sets it; `change(value)` is what to do after. Then
+// `newId` and `onNew` for the button that starts over, `mood(state)`
+// for the line under it, `query(q)` for anything else in the query
+// string, `fileName` and `suffix(state)` for the saved png, and
+// `ready()` once everything is applied.
+export function mountChrome(viewer, spec) {
+  const doc = spec.document || document;
   const $ = id => doc.getElementById(id);
-  const { state, presets } = wall;
+  const { state } = viewer;
+  const presets = spec.presets || {};
+  const controls = spec.controls || [];
   const presetCards = doc.querySelectorAll('.card[data-preset]');
   const markPreset = name => presetCards.forEach(c => c.classList.toggle('on', c.dataset.preset === name));
-  const set = (id, v) => { const el = $(id); if (el) el.value = v; };
   const text = (id, v) => { const el = $(id); if (el) el.textContent = v; };
-  const check = (id, v) => { const el = $(id); if (el) el.checked = v; };
+  const valId = c => c.valId || c.id + 'Val';
+  const keyOf = c => c.key || c.id;
 
-  function syncZoom() {
-    set('zoom', Math.round(state.scale)); text('zoomVal', Math.round(state.scale) + 'px');
+  function sync() {
+    for (const c of controls) {
+      const el = $(c.id), v = state[keyOf(c)];
+      if (!el) continue;
+      if (c.kind === 'check') el.checked = !!v;
+      else el.value = v;
+      if (c.kind === 'range') text(valId(c), c.fmt ? c.fmt(v) : String(v));
+    }
+    if (spec.mood) text('mood', spec.mood(state));
+    markPreset(viewer.preset);
   }
-  function syncControls() {
-    set('repeat', state.repeat);
-    set('palette', state.pal);
-    set('motif', state.motif);
-    set('density', state.density); text('densityVal', state.density);
-    set('hand', state.hand); text('handVal', Number(state.hand).toFixed(2));
-    set('brush', state.brush); text('brushVal', Number(state.brush).toFixed(1));
-    syncZoom();
-    check('bands', state.bands); check('grout', state.grout); check('age', state.age);
-    text('mood', 'design nº ' + state.seed);
-    markPreset(wall.preset);
-  }
-  wall.onChange = kind => { if (kind === 'zoom') syncZoom(); else syncControls(); };
+  viewer.onChange = () => sync();
 
-  presetCards.forEach(c => c.addEventListener('click', () => wall.applyPreset(c.dataset.preset)));
+  presetCards.forEach(c => c.addEventListener('click', () => { spec.applyPreset(c.dataset.preset); sync(); }));
 
-  // each preset card shows its own wall, four tiles of it
-  for (const card of presetCards) {
+  // each preset card shows its own small piece of wall
+  if (spec.thumb) for (const card of presetCards) {
     const p = presets[card.dataset.preset], tc = card.querySelector('canvas');
     if (!p || !tc) continue;
-    paintThumb(wall, p, tc.getContext('2d'), 52, 2);
+    spec.thumb(tc.getContext('2d'), p);
   }
 
   // tabs
@@ -616,25 +675,27 @@ export function mountPanel(wall, opts) {
     });
   }
 
-  const edited = () => { wall.preset = ''; markPreset(''); };
+  const edited = () => { viewer.preset = ''; markPreset(''); };
+  const parse = (c, el) => c.kind === 'check' ? el.checked : c.kind === 'range' ? (c.int ? parseInt(el.value, 10) : parseFloat(el.value)) : el.value;
+  for (const c of controls) {
+    const el = $(c.id);
+    if (!el) continue;
+    el.addEventListener(c.kind === 'range' ? 'input' : 'change', () => {
+      const v = parse(c, el);
+      state[keyOf(c)] = v;
+      if (c.kind === 'range') text(valId(c), c.fmt ? c.fmt(v) : String(v));
+      if (!c.keep) edited();
+      if (c.change) c.change(v);
+    });
+  }
   const on = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
-  on('repeat', 'change', e => { state.repeat = e.target.value; edited(); wall.rebuild(true); });
-  on('palette', 'change', e => { state.pal = e.target.value; edited(); wall.rebuild(true); });
-  on('motif', 'change', e => { state.motif = e.target.value; edited(); wall.rebuild(true); });
-  on('density', 'input', e => { state.density = parseInt(e.target.value, 10); text('densityVal', state.density); edited(); wall.rebuild(true); });
-  on('hand', 'input', e => { state.hand = parseFloat(e.target.value); text('handVal', state.hand.toFixed(2)); edited(); wall.rebuild(true); });
-  on('brush', 'input', e => { state.brush = parseFloat(e.target.value); text('brushVal', state.brush.toFixed(1)); edited(); wall.rebuild(true); });
-  on('zoom', 'input', e => { state.scale = parseInt(e.target.value, 10); text('zoomVal', state.scale + 'px'); edited(); wall.rebuild(true); });
-  on('bands', 'change', e => { state.bands = e.target.checked; edited(); wall.rebuild(true); });
-  on('grout', 'change', e => { state.grout = e.target.checked; wall.rebuild(false); });
-  on('age', 'change', e => { state.age = e.target.checked; wall.rebuild(false); });
-  on('newDesign', 'click', () => wall.newDesign());
+  if (spec.onNew) on(spec.newId || 'newDesign', 'click', () => { spec.onNew(); sync(); });
 
   on('save', 'click', () => {
-    wall.canvas.toBlob(blob => {
+    viewer.canvas.toBlob(blob => {
       const a = doc.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = (opts.fileName || 'wall') + '-' + state.seed + '.png';
+      a.download = (spec.fileName || 'wall') + '-' + (spec.suffix ? spec.suffix(state) : state.seed) + '.png';
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
     });
@@ -646,6 +707,7 @@ export function mountPanel(wall, opts) {
       panel.classList.toggle('closed');
       text('panelToggle', panel.classList.contains('closed') ? '+' : '−');
     });
+    // on a phone the open panel would cover the art; start it folded
     if (window.innerWidth < 520) {
       panel.classList.add('closed');
       text('panelToggle', '+');
@@ -659,25 +721,69 @@ export function mountPanel(wall, opts) {
     titleGone = true;
     if (titleEl) titleEl.classList.add('gone');
   }
-  wall.onInteract = dismissTitle;
+  viewer.onInteract = dismissTitle;
   setTimeout(dismissTitle, 7000);
 
-  // shareable settings, e.g. ?preset=triana or ?seed=4242&repeat=rotate&pal=coimbra&motif=laceria
+  // the query string: a preset, then any control by its key, within
+  // what the page's own element allows
   const q = new URLSearchParams(location.search);
-  wall.applyPreset(q.get('preset') || opts.defaultPreset || Object.keys(presets)[0]);
-  if (q.has('seed')) { state.seed = parseInt(q.get('seed'), 10) || state.seed; wall.preset = ''; }
-  if (q.has('repeat') && REPEATS.includes(q.get('repeat'))) state.repeat = q.get('repeat');
-  if (q.has('pal') && wall.palettes[q.get('pal')]) state.pal = q.get('pal');
-  if (q.has('motif') && wall.motifs[q.get('motif')]) state.motif = q.get('motif');
-  const de = parseInt(q.get('density'), 10);
-  if (de >= 1 && de <= 5) state.density = de;
-  const ha = parseFloat(q.get('hand'));
-  if (ha >= 0 && ha <= 1) state.hand = ha;
-  const z = parseInt(q.get('zoom'), 10);
-  if (z >= 40 && z <= 260) state.scale = z;
-  if (q.get('bands') === '0') state.bands = false;
-  if (q.get('age') === '1') state.age = true;
-  syncControls();
-  wall.rebuild(true);
-  return { syncControls, dismissTitle };
+  spec.applyPreset(q.get('preset') || spec.defaultPreset || Object.keys(presets)[0]);
+  for (const c of controls) {
+    const k = keyOf(c), qn = c.q || k;
+    if (!q.has(qn)) continue;
+    const el = $(c.id), raw = q.get(qn);
+    let v;
+    if (c.kind === 'check') { if (raw !== '0' && raw !== '1') continue; v = raw === '1'; }
+    else if (c.kind === 'range') {
+      v = c.int ? parseInt(raw, 10) : parseFloat(raw);
+      if (!(v >= parseFloat(el ? el.min : -Infinity) && v <= parseFloat(el ? el.max : Infinity))) continue;
+    } else {
+      if (el && ![...el.options].some(o => o.value === raw)) continue;
+      v = raw;
+    }
+    state[k] = v;
+    if (!c.keep) viewer.preset = '';
+  }
+  if (spec.query) spec.query(q);
+  sync();
+  if (spec.ready) spec.ready();
+  return { sync, dismissTitle, markPreset };
+}
+
+// -------------------------------------------------------------- panel ---
+// mountPanel(wall, { fileName, defaultPreset }) is mountChrome with the
+// tile wall's controls: selects `repeat`, `motif` and `palette`; ranges
+// `density`, `hand`, `brush` and `zoom` with `densityVal`, `handVal`,
+// `brushVal` and `zoomVal` beside them; checkboxes `bands`, `grout` and
+// `age`; the `newDesign` button. The query string takes ?preset=,
+// ?seed=, ?repeat=, ?pal=, ?motif=, ?density=, ?hand=, ?zoom=, ?bands=0
+// and ?age=1.
+export function mountPanel(wall, opts) {
+  opts = opts || {};
+  const { state } = wall;
+  const tiles = () => wall.rebuild(true), face = () => wall.rebuild(false);
+  return mountChrome(wall, {
+    document: opts.document,
+    presets: wall.presets,
+    defaultPreset: opts.defaultPreset,
+    applyPreset: name => wall.applyPreset(name),
+    thumb: (g, p) => paintThumb(wall, p, g, 52, 2),
+    controls: [
+      { id: 'repeat', kind: 'select', change: tiles },
+      { id: 'palette', key: 'pal', kind: 'select', change: tiles },
+      { id: 'motif', kind: 'select', change: tiles },
+      { id: 'density', kind: 'range', int: true, change: tiles },
+      { id: 'hand', kind: 'range', fmt: v => Number(v).toFixed(2), change: tiles },
+      { id: 'brush', kind: 'range', fmt: v => Number(v).toFixed(1), change: tiles },
+      { id: 'zoom', key: 'scale', q: 'zoom', kind: 'range', int: true, fmt: v => Math.round(v) + 'px', keep: true, change: tiles },
+      { id: 'bands', kind: 'check', keep: true, change: tiles },
+      { id: 'grout', kind: 'check', keep: true, change: face },
+      { id: 'age', kind: 'check', keep: true, change: face },
+    ],
+    newId: 'newDesign', onNew: () => wall.newDesign(),
+    mood: s => 'design nº ' + s.seed,
+    query: q => { if (q.has('seed')) { state.seed = parseInt(q.get('seed'), 10) || state.seed; wall.preset = ''; } },
+    fileName: opts.fileName,
+    ready: tiles,
+  });
 }
