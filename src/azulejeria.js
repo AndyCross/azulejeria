@@ -13,6 +13,11 @@
 // each turned and shifted a little, some crazed) and the standard
 // control panel. Motifs, palettes and presets belong to the page that
 // uses it. See README.md for the shape of each.
+//
+// A material, optionally, changes what the tile is made of without
+// touching what is drawn on it: how the ground is laid, how a shape
+// is filled, how far a piece strays from the drawing, what the grout
+// is, and what age does. Without one the tile is tin-glazed.
 
 // ------------------------------------------------------------- random ---
 export function mulberry32(a) {
@@ -210,17 +215,28 @@ export const PAINTERS = {
   },
 };
 
-// paints one design into the unit square of g (already scaled)
-export function paintDesign(g, els, pal, hand, lw, jseed, painters) {
+// paints one design into the unit square of g (already scaled). The
+// material, if given, may supply `ampOf(hand)`, `shape(g, pts, col, b)`,
+// `line(g, pts, lw, close, b)` and `dot(g, x, y, r, col, a, b)`.
+export function paintDesign(g, els, pal, hand, lw, jseed, painters, material) {
   const rng = mulberry32(jseed);
-  const amp = 0.012 * hand;
+  const m = material || {};
+  const amp = m.ampOf ? m.ampOf(hand) : 0.012 * hand;
   const Q = Math.PI / 2, D = Q / 2;
   const dc = Math.cos(D), ds = Math.sin(D);       // the diagonal
-  const shape = (pts, col) => { wash(g, pts, col, rng); ink(g, pts, lw, pal, rng, true); };
-  const dot = (x, y, r, col, a) => {
-    g.beginPath(); g.arc(x, y, r, 0, 6.283);
-    g.fillStyle = col || pal.ink; g.globalAlpha = a || 0.85; g.fill(); g.globalAlpha = 1;
-  };
+  const b = { g, pal, lw, amp, rng, Q, D, dc, ds, col: pal.wash };
+  const shape = m.shape
+    ? (pts, col) => m.shape(g, pts, col, b)
+    : (pts, col) => { wash(g, pts, col, rng); ink(g, pts, lw, pal, rng, true); };
+  const line = m.line
+    ? (pts, w, close) => m.line(g, pts, w, close, b)
+    : (pts, w, close) => ink(g, pts, w, pal, rng, close);
+  const dot = m.dot
+    ? (x, y, r, col, a) => m.dot(g, x, y, r, col, a, b)
+    : (x, y, r, col, a) => {
+      g.beginPath(); g.arc(x, y, r, 0, 6.283);
+      g.fillStyle = col || pal.ink; g.globalAlpha = a || 0.85; g.fill(); g.globalAlpha = 1;
+    };
   const petal = (cx, cy, ang, rIn, rOut, wd, col) => shape(petalPts(cx, cy, ang, rIn, rOut, wd, amp, rng), col);
   const kite = (cx, cy, ang, rIn, rOut, wd, col) => shape(kitePts(cx, cy, ang, rIn, rOut, wd, amp, rng), col);
   const lobes = (cx, cy, r, a0, a1, count) => {
@@ -232,7 +248,7 @@ export function paintDesign(g, els, pal, hand, lw, jseed, painters) {
     }
   };
   const altOf = el => pal.accents.length ? pal.accents[((el.ai || 0) + 1) % pal.accents.length] : pal.ink;
-  const b = { g, pal, lw, amp, rng, Q, D, dc, ds, shape, dot, petal, kite, lobes, altOf, col: pal.wash };
+  Object.assign(b, { shape, line, dot, petal, kite, lobes, altOf });
   for (const el of els) {
     const painter = painters[el.t];
     if (!painter) continue;
@@ -252,23 +268,28 @@ export function makeTile(o, S, k, jseed) {
   const g = c.getContext('2d');
   g.scale(k, k);
   const rng = mulberry32(jseed);
-  const pal = o.pal;
+  const pal = o.pal, m = o.material || {};
   g.fillStyle = pal.glaze;
   g.fillRect(0, 0, S, S);
-  for (let i = 0; i < 3; i++) {
-    const x = rng() * S, y = rng() * S, rr = S * (0.3 + rng() * 0.5);
-    const gr = g.createRadialGradient(x, y, 0, x, y, rr);
-    gr.addColorStop(0, hexA(pal.tint, 0.22));
-    gr.addColorStop(1, hexA(pal.tint, 0));
-    g.fillStyle = gr;
-    g.fillRect(0, 0, S, S);
+  if (m.surface) m.surface(g, S, pal, rng);
+  else {
+    for (let i = 0; i < 3; i++) {
+      const x = rng() * S, y = rng() * S, rr = S * (0.3 + rng() * 0.5);
+      const gr = g.createRadialGradient(x, y, 0, x, y, rr);
+      gr.addColorStop(0, hexA(pal.tint, 0.22));
+      gr.addColorStop(1, hexA(pal.tint, 0));
+      g.fillStyle = gr;
+      g.fillRect(0, 0, S, S);
+    }
+    // glaze thickens at the edge
+    g.strokeStyle = hexA(pal.ink, 0.06);
+    g.lineWidth = S * 0.06;
+    g.strokeRect(0, 0, S, S);
   }
-  // glaze thickens at the edge
-  g.strokeStyle = hexA(pal.ink, 0.06);
-  g.lineWidth = S * 0.06;
-  g.strokeRect(0, 0, S, S);
   g.lineCap = 'round'; g.lineJoin = 'round';
-  if (o.plain) {
+  if (o.plain && m.plain) {
+    m.plain(g, S, pal, mulberry32(jseed + 3), o);
+  } else if (o.plain) {
     g.save(); g.translate(S / 2, S / 2); g.scale(S, S);
     const r2 = mulberry32(jseed + 3);
     const amp = 0.012 * o.hand;
@@ -282,12 +303,12 @@ export function makeTile(o, S, k, jseed) {
     let v = 0;
     for (const [fx, fy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
       g.save(); g.translate(S / 2, S / 2); g.scale(fx * S / 2, fy * S / 2);
-      paintDesign(g, o.design, pal, o.hand, 0.024 * o.brush, jseed + 17 + v++, o.painters);
+      paintDesign(g, o.design, pal, o.hand, 0.024 * o.brush, jseed + 17 + v++, o.painters, o.material);
       g.restore();
     }
   } else {
     g.save(); g.translate(S, S); g.scale(-S, -S);
-    paintDesign(g, o.design, pal, o.hand, 0.012 * o.brush, jseed + 17, o.painters);
+    paintDesign(g, o.design, pal, o.hand, 0.012 * o.brush, jseed + 17, o.painters, o.material);
     g.restore();
   }
   return c;
@@ -301,7 +322,7 @@ export function tileOpts(cfg, s) {
   const pal = cfg.palettes[s.pal];
   const quarter = s.repeat === 'single' || s.repeat === 'checker';
   const design = makeDesign(s.seed, s.density, s.bands, quarter ? 1.35 : 1, cfg.motifs[s.motif]);
-  return { pal, design, quarter, hand: s.hand, brush: s.brush, painters: cfg.painters };
+  return { pal, design, quarter, hand: s.hand, brush: s.brush, painters: cfg.painters, material: cfg.material };
 }
 
 // a small wall of four tiles, for a preset card
@@ -329,12 +350,18 @@ export function paintThumb(cfg, p, g, T, k) {
 // the wall with the tiles it has. `applyPreset(name)`, `newDesign()`
 // and `zoomAt(x, y, factor)` do the usual things. Set `onChange(kind)`
 // to hear about them ('preset', 'design', 'zoom') and `onInteract()`
-// to hear the first touch.
+// to hear the first touch. `material`, if given, may supply the
+// painting hooks above plus `lay` ({ shift, turn }, how far a tile
+// strays from its cell), `gapOf(S, state)` (the grout, in pixels),
+// `age(ctx, t)` (what age does to one tile, drawn over it in the
+// tile's own frame) and `finish(ctx, W, H, state, pal)` (over the wall).
 export function createWall(canvas, cfg) {
   const ctx = canvas.getContext('2d');
   const DPR = Math.min(window.devicePixelRatio || 1, 2);
   const palettes = cfg.palettes, motifs = cfg.motifs, presets = cfg.presets || {};
   const painters = cfg.painters || PAINTERS;
+  const material = cfg.material || null, m = material || {};
+  const lay = m.lay || { shift: 0.014, turn: 0.016 };
   const firstMotif = Object.keys(motifs)[0];
   for (const p of Object.values(presets)) if (!p.motif) p.motif = firstMotif;
 
@@ -352,8 +379,8 @@ export function createWall(canvas, cfg) {
     grout: true,
     age: false,
   };
-  const wall = { canvas, ctx, state, palettes, motifs, painters, presets, preset: '', W: 0, H: 0, onChange: null, onInteract: null };
-  const tcfg = { palettes, motifs, painters };
+  const wall = { canvas, ctx, state, palettes, motifs, painters, material, presets, preset: '', W: 0, H: 0, onChange: null, onInteract: null };
+  const tcfg = { palettes, motifs, painters, material };
 
   let tiles = { A: [], B: [] }, needTiles = true, dirty = true;
 
@@ -377,7 +404,7 @@ export function createWall(canvas, cfg) {
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
     const S = state.scale;
-    const gap = state.grout ? Math.max(1.2, S * 0.022) : 0;
+    const gap = state.grout ? (m.gapOf ? m.gapOf(S, state) : Math.max(1.2, S * 0.022)) : 0;
     const ox = W / 2 + state.panX, oy = H / 2 + state.panY;
     const i0 = Math.floor(-ox / S) - 1, i1 = Math.ceil((W - ox) / S) + 1;
     const j0 = Math.floor(-oy / S) - 1, j1 = Math.ceil((H - oy) / S) + 1;
@@ -392,11 +419,13 @@ export function createWall(canvas, cfg) {
         else if (state.repeat === 'checker' && ((i + j) & 1)) set = tiles.B;
         const img = set[Math.floor(rng() * set.length)];
         ctx.save();
-        ctx.translate(cx + (rng() - 0.5) * S * 0.014 * state.hand, cy + (rng() - 0.5) * S * 0.014 * state.hand);
-        ctx.rotate(rot + (rng() - 0.5) * 0.016 * state.hand);
+        ctx.translate(cx + (rng() - 0.5) * S * lay.shift * state.hand, cy + (rng() - 0.5) * S * lay.shift * state.hand);
+        ctx.rotate(rot + (rng() - 0.5) * lay.turn * state.hand);
         ctx.scale(fx, fy);
         ctx.drawImage(img, -s / 2, -s / 2, s, s);
-        if (state.age) {
+        if (state.age && m.age) {
+          m.age(ctx, { i, j, rng, s, S, pal, state, cx: (i + 0.5) * S, cy: (j + 0.5) * S, fx, fy, rot });
+        } else if (state.age) {
           // a warm cast on some, a craze on a few, a chipped corner on fewer
           if (rng() < 0.5) { ctx.fillStyle = `rgba(120, 85, 30, ${0.04 + rng() * 0.1})`; ctx.fillRect(-s / 2, -s / 2, s, s); }
           if (rng() < 0.18) {
@@ -423,7 +452,8 @@ export function createWall(canvas, cfg) {
         ctx.restore();
       }
     }
-    if (state.age) {
+    if (m.finish) m.finish(ctx, W, H, state, pal);
+    else if (state.age) {
       ctx.fillStyle = 'rgba(90, 60, 20, 0.05)';
       ctx.fillRect(0, 0, W, H);
     }

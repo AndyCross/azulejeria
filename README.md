@@ -11,9 +11,11 @@ drifts. Washes are laid thin twice so the glaze pools. Each tile gets its
 own mottled glaze, a slight turn, a slight shift, and a few of them craze.
 
 This package is the engine. You bring the motifs, the palettes and the
-presets. Two walls built on it: [Azulejería](https://stepinto.dev/art/azulejeria.html)
-(Talavera rosettes and Mudéjar strapwork) and [Jerez](https://stepinto.dev/art/jerez.html)
-(vines, horses and sherry). The design is written up
+presets, and, if the tile is not glazed, a material. Three walls built on
+it: [Azulejería](https://stepinto.dev/art/azulejeria.html) (Talavera
+rosettes and Mudéjar strapwork), [Jerez](https://stepinto.dev/art/jerez.html)
+(vines, horses and sherry) and [Hidráulico](https://stepinto.dev/art/hidraulico.html)
+(pigmented cement, pressed rather than painted). The design is written up
 [here](https://stepinto.dev/posts/tiles-painted-by-rule/).
 
 ```
@@ -74,7 +76,7 @@ tap. Drive it from your own controls through `wall.state` and
 
 ## The parts
 
-**`createWall(canvas, { palettes, motifs, painters, presets })`** returns
+**`createWall(canvas, { palettes, motifs, painters, presets, material })`** returns
 the wall. `wall.state` holds `seed`, `repeat` (`module`, `rotate`,
 `single` or `checker`), `pal`, `motif`, `density` (1 to 5), `hand` (0 to
 1, how far the brush drifts), `brush` (line weight), `scale` (pixels per
@@ -83,6 +85,24 @@ them call `wall.rebuild(true)` to repaint the tiles, or `wall.rebuild(false)`
 for things the wall draws itself (pan, grout, age). `wall.applyPreset(name)`,
 `wall.newDesign()` and `wall.zoomAt(x, y, factor)` do what they say. Set
 `wall.onChange(kind)` to be told about them.
+
+**A material** changes what the tile is made of without touching what is
+drawn on it. It is an object of optional hooks, and without one the tile
+is tin-glazed. `ampOf(hand)` turns the hand slider into a wobble
+amplitude (glaze: `0.012 * hand`). `shape(g, pts, col, b)`,
+`line(g, pts, lw, close, b)` and `dot(g, x, y, r, col, alpha, b)` replace
+the brush's strokes, so a cement tile can fill flat and bleed at the edge
+where glaze would wash and ink. `surface(g, S, pal, rng)` lays the ground
+after the glaze colour is filled (the blooms of tint, or grain).
+`plain(g, S, pal, rng, o)` paints the tile a checker alternates with.
+`lay` is `{ shift, turn }`, how far a tile strays from its cell at hand
+one (glaze: `0.014` of a tile and `0.016` radians). `gapOf(S, state)` is
+the grout in pixels. `age(ctx, t)` is drawn over each tile in its own
+frame when age is on, with `t` carrying `i`, `j`, the tile's `rng`, its
+drawn size `s`, the cell size `S`, `pal`, `state` and the tile's world
+centre `cx`, `cy`, so wear can follow the line people walk. `finish(ctx,
+W, H, state, pal)` is drawn over the whole wall last. None of the hooks
+read the design's rng, so a material never moves a design.
 
 **`mountPanel(wall, { fileName, defaultPreset })`** wires the standard
 panel, which is a handful of elements found by id: selects `repeat`,
