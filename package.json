@@ -1,8 +1,8 @@
 {
   "name": "azulejeria",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Tin-glazed tiles painted by rule. A seeded canvas engine for Spanish azulejo walls: a diagonal-symmetric design, brushwork that drifts, washes that pool, and four ways to repeat the tile.",
-  "keywords": ["canvas", "generative", "tiles", "azulejo", "mudejar", "sevilla", "pattern", "procedural", "art", "wallpaper"],
+  "keywords": ["canvas", "generative", "tiles", "azulejo", "mudejar", "sevilla", "pattern", "procedural", "art", "wallpaper", "interlace", "knotwork", "celtic"],
   "license": "MIT",
   "author": "Andy Cross",
   "homepage": "https://stepinto.dev/art/azulejeria.html",
@@ -11,11 +11,12 @@
   "main": "./src/azulejeria.js",
   "exports": {
     ".": "./src/azulejeria.js",
+    "./knots": "./src/knots.js",
     "./azulejeria.css": "./src/azulejeria.css"
   },
   "files": ["src", "README.md", "LICENSE"],
   "sideEffects": false,
   "scripts": {
-    "test": "node --check src/azulejeria.js"
+    "test": "node --check src/azulejeria.js && node --check src/knots.js && node --check src/head.js"
   }
 }

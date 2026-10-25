@@ -18,7 +18,8 @@ rosettes and Mudéjar strapwork), [Jerez](https://stepinto.dev/art/jerez.html)
 (pigmented cement, pressed rather than painted). Underneath the wall is a
 viewer, a canvas you paint any world into, with the drag, the pinch, the
 wheel and the page chrome; [Alicatado](https://stepinto.dev/art/alicatado.html)
-(cut tile set in lime) is the viewer with its own paint. The design is
+(cut tile set in lime) is the viewer with its own paint, and
+[Knotwork](https://stepinto.dev/art/knotwork.html) is the viewer with the knots below. The design is
 written up [here](https://stepinto.dev/posts/tiles-painted-by-rule/) and
 [here](https://stepinto.dev/posts/cut-tile-and-poured-cement/).
 
@@ -181,6 +182,63 @@ line edge to edge that mirrors into a lozenge net) and `dots`.
 bands, bold, motif)`, `paintDesign(g, els, pal, hand, lw, seed, painters)`,
 `makeTile(opts, size, pixelRatio, seed)`, `tileOpts(cfg, state)` and
 `paintThumb(cfg, preset, g, size, pixelRatio)`.
+
+## Knots
+
+`azulejeria/knots` is interlace by rule, for the
+[Knotwork](https://stepinto.dev/art/knotwork.html) page and anything
+else that wants a strand to go over and under. It draws on any 2D
+context and uses nothing from the wall.
+
+```js
+import { buildKnot, paintKnot, masks } from 'azulejeria/knots';
+import { mulberry32 } from 'azulejeria';
+
+const knot = buildKnot({ nx: 8, ny: 8, rng: mulberry32(698), breaks: 0.3, cuts: 0.05 });
+paintKnot(g, knot, {
+  place: (x, y) => [x / 2, y / 2],      // doubled grid point -> where to draw it
+  ribbon: 0.34, inkWidth: 0.045, ink: '#2a1e14', ground: '#efe1c0',
+  colour: s => ['#d9a62e', '#c8562e', '#4f8a5e'][Math.floor(s.pig * 3)],
+  bends: 'corners', heads: true,
+});
+```
+
+The knot lives on a grid of squares in doubled coordinates: corners
+at (even, even), edge midpoints at (odd, even) and (even, odd). A
+strand steps diagonally from midpoint to midpoint, so two cross at
+every midpoint. A break is an edge the strand turns back off; the rim
+of the region is all breaks, so every strand closes. A cut is a break
+the strand ends at instead, and the two ends that meet at a cut become
+a beast, one end a head biting the other. No two cuts sit side by
+side, so the heads have room. Over and under come from
+parity (a horizontal edge takes the rising strand over, a vertical one
+the falling), which alternates round every strand without walking it.
+
+**`buildKnot({ nx, ny, rng, breaks, runs, cuts, mask, symmetry })`**:
+`breaks` is the chance an interior edge is a break, `runs` the chance
+a break carries on along its line for another edge or two (which is
+what gives a knot corners), `cuts` the chance a break is a cut.
+They are chosen a whole orbit of the grid's mirrors at a time:
+`symmetry` is `'d4'` (the default for a square grid), `'d2'` or
+`'none'`. `mask(i, j)` says which squares are in the region, so a
+knot can fill a cross or the field around one; `masks.plus`,
+`masks.grow` and `masks.not` make the carpet-page shapes. It returns
+`{ strands, beasts, edge, square }`; each strand has its `pts` (kind
+`cross` with `over`, `wall`, `rim` or `end`), whether it is `open`,
+and `pig`, a seeded number for choosing its colour.
+
+**`paintKnot(g, knot, opts)`**: `place(x, y)` maps a grid point to
+the context (add the hand's drift there), `ribbon` and `inkWidth` are
+in the context's units, `colour(strand)` gives each core, `ground` is
+the fill style for the gap cut either side of an over strand, `split`
+puts a line down the middle of the ribbon, `bends` is `'round'`,
+`'corners'` (pointed where a strand turns in a corner of the rim) or
+`'pointed'` (every bounce off the rim), and `heads` draws the beasts.
+A beast's head is traced from a drawing of an Insular hound's head
+(`src/head.js`): it turns off its strand on a narrower neck (`neck`,
+0.55 of the ribbon) and lies along the cut facing the other end, which
+hooks round under it and into its jaws. `eye` colours its eye.
+`strandPath` and `ribbon` are exported for drawing a strand yourself.
 
 ## Licence
 
