@@ -18,8 +18,10 @@ rosettes and Mudéjar strapwork), [Jerez](https://stepinto.dev/art/jerez.html)
 (pigmented cement, pressed rather than painted). Underneath the wall is a
 viewer, a canvas you paint any world into, with the drag, the pinch, the
 wheel and the page chrome; [Alicatado](https://stepinto.dev/art/alicatado.html)
-(cut tile set in lime) is the viewer with its own paint, and
-[Knotwork](https://stepinto.dev/art/knotwork.html) is the viewer with the knots below. The design is
+(cut tile set in lime) is the viewer with the cutter below,
+[Trencadís](https://stepinto.dev/art/trencadis.html) is the viewer breaking
+Azulejería's tiles with it, and
+[Knotwork](https://stepinto.dev/art/knotwork.html) is the viewer with the knots. The design is
 written up [here](https://stepinto.dev/posts/tiles-painted-by-rule/) and
 [here](https://stepinto.dev/posts/cut-tile-and-poured-cement/).
 
@@ -182,6 +184,44 @@ line edge to edge that mirrors into a lozenge net) and `dots`.
 bands, bold, motif)`, `paintDesign(g, els, pal, hand, lw, seed, painters)`,
 `makeTile(opts, size, pixelRatio, seed)`, `tileOpts(cfg, state)` and
 `paintThumb(cfg, preset, g, size, pixelRatio)`.
+
+## Pieces
+
+`azulejeria/pieces` is the cutter: what happens to a polygon between
+the drawing and the wall. It is the geometry of the hammer and the
+trowel, for [Alicatado](https://stepinto.dev/art/alicatado.html) (faces
+of a star pattern) and [Trencadís](https://stepinto.dev/art/trencadis.html)
+(shards of a broken tile); the glaze on a piece is the page's own.
+
+```js
+import { voronoi, cutPiece, relief, pathPoly } from 'azulejeria/pieces';
+
+const cells = voronoi(sites, 0.75);                  // one convex cell per site
+for (const poly of cells) {
+  const { inner } = cutPiece({ poly }, { cut: 0.6, mortar: 0.02 }, rng);
+  pathPoly(g, inner); g.fillStyle = glaze; g.fill();
+  relief(g, inner, Lx, Ly, 0.007);                    // a lit edge and a shaded one
+}
+```
+
+**`cutPiece({ poly, area }, { cut, mortar }, rng)`** takes a
+counter-clockwise polygon and returns `{ outer, inner, c }`: the piece
+shifted and turned by the fraction a hand allows, each corner landing
+a touch off the drawing, long edges bowed; then `inner`, the same
+inset by half the `mortar` with a mitred offset, so the joint is one
+width along an edge and at a point. `cut` (0 to 1) is how far it
+strays. The rng is drawn from in a fixed order, so seed it per piece
+and the piece is stable. **`offsetPoly(poly, d)`** is the inset on its
+own.
+
+**`voronoi(sites, reach)`** returns one convex cell per `[x, y]`
+site, clipped from a square of half-width `reach` by the bisectors
+with its neighbours; `reach` should be more than any gap between
+neighbouring sites. **`relief(g, poly, Lx, Ly, w)`** strokes each edge
+lit or shaded by where it faces the light. **`grain(seed, size)`** is
+a small speckle tile for mortar. `centroid`, `signedArea`,
+`ensureCCW`, `regularPoly` and `pathPoly` are the small polygon maths
+every page wanted.
 
 ## Knots
 
