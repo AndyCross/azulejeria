@@ -183,7 +183,7 @@ diamond), `ring` (a scalloped ring around the main corner), `lattice` (a
 line edge to edge that mirrors into a lozenge net) and `dots`.
 
 **The lower level** is there if you want it: `makeDesign(seed, density,
-bands, bold, motif)`, `paintDesign(g, els, pal, hand, lw, seed, painters)`,
+bands, bold, motif)`, `paintDesign(g, els, pal, hand, lw, seed, painters, material, brush)`,
 `makeTile(opts, size, pixelRatio, seed)`, `tileOpts(cfg, state)` and
 `paintThumb(cfg, preset, g, size, pixelRatio)`.
 

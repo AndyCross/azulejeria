@@ -219,14 +219,16 @@ export const PAINTERS = {
 
 // paints one design into the unit square of g (already scaled). The
 // material, if given, may supply `ampOf(hand)`, `shape(g, pts, col, b)`,
-// `line(g, pts, lw, close, b)` and `dot(g, x, y, r, col, a, b)`.
-export function paintDesign(g, els, pal, hand, lw, jseed, painters, material) {
+// `line(g, pts, lw, close, b)` and `dot(g, x, y, r, col, a, b)`. The
+// brush `b` also carries `hand` and `brush` as the state has them, for
+// a painter whose line is not drawn with `lw` (a traced drawing, say).
+export function paintDesign(g, els, pal, hand, lw, jseed, painters, material, brush) {
   const rng = mulberry32(jseed);
   const m = material || {};
   const amp = m.ampOf ? m.ampOf(hand) : 0.012 * hand;
   const Q = Math.PI / 2, D = Q / 2;
   const dc = Math.cos(D), ds = Math.sin(D);       // the diagonal
-  const b = { g, pal, lw, amp, rng, Q, D, dc, ds, col: pal.wash };
+  const b = { g, pal, lw, amp, rng, Q, D, dc, ds, col: pal.wash, hand, brush: brush === undefined ? 1 : brush };
   const shape = m.shape
     ? (pts, col) => m.shape(g, pts, col, b)
     : (pts, col) => { wash(g, pts, col, rng); ink(g, pts, lw, pal, rng, true); };
@@ -307,12 +309,12 @@ export function makeTile(o, S, k, jseed) {
     let v = 0;
     for (const [fx, fy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
       g.save(); g.translate(S / 2, S / 2); g.scale(fx * S / 2, fy * S / 2);
-      paintDesign(g, o.design, pal, o.hand, 0.024 * o.brush, jseed + 17 + v++, o.painters, o.material);
+      paintDesign(g, o.design, pal, o.hand, 0.024 * o.brush, jseed + 17 + v++, o.painters, o.material, o.brush);
       g.restore();
     }
   } else {
     g.save(); g.translate(S, S); g.scale(-S, -S);
-    paintDesign(g, o.design, pal, o.hand, 0.012 * o.brush, jseed + 17, o.painters, o.material);
+    paintDesign(g, o.design, pal, o.hand, 0.012 * o.brush, jseed + 17, o.painters, o.material, o.brush);
     g.restore();
   }
   return c;
