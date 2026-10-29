@@ -262,7 +262,9 @@ export function paintDesign(g, els, pal, hand, lw, jseed, painters, material) {
 // --------------------------------------------------------------- tile ---
 // One tile, painted. `o.quarter` lays the design four times mirrored
 // about the centre; otherwise the design fills the tile with its main
-// corner at bottom right, for the module to complete. `o.plain` paints
+// corner at bottom right, for the module to complete (or, with the
+// 'whole' repeat, every tile laid the same way up: a tile that is a
+// picture). `o.plain` paints
 // the small tile a checker alternates with.
 export function makeTile(o, S, k, jseed) {
   const c = document.createElement('canvas');
@@ -316,7 +318,7 @@ export function makeTile(o, S, k, jseed) {
   return c;
 }
 
-export const REPEATS = ['module', 'rotate', 'single', 'checker'];
+export const REPEATS = ['module', 'rotate', 'single', 'checker', 'whole'];
 const ROT = [0, Math.PI / 2, 3 * Math.PI / 2, Math.PI];
 
 // the tile options for a given state (preset or live)
@@ -468,8 +470,10 @@ export function createViewer(canvas, opts) {
 }
 
 // --------------------------------------------------------------- wall ---
-// createWall(canvas, { palettes, motifs, painters, presets, material })
-// is a viewer that paints a wall of tiles. It returns the wall, which
+// createWall(canvas, { palettes, motifs, painters, presets, material,
+// variants }) is a viewer that paints a wall of tiles. `variants` is how
+// many paintings of the design the wall draws from (four unless told
+// otherwise; a wall of whole tiles, each its own picture, wants more). It returns the wall, which
 // is the viewer with more on it: `state` to read or change, then
 // `rebuild(true)` to repaint the tiles or `rebuild(false)` to redraw
 // the wall with the tiles it has. `applyPreset(name)`, `newDesign()`
@@ -485,6 +489,7 @@ export function createWall(canvas, cfg) {
   const painters = cfg.painters || PAINTERS;
   const material = cfg.material || null, m = material || {};
   const lay = m.lay || { shift: 0.014, turn: 0.016 };
+  const variants = cfg.variants || 4;
   const firstMotif = Object.keys(motifs)[0];
   for (const p of Object.values(presets)) if (!p.motif) p.motif = firstMotif;
 
@@ -511,7 +516,7 @@ export function createWall(canvas, cfg) {
     const o = tileOpts(tcfg, state);
     tiles.A = [];
     tiles.B = [];
-    for (let v = 0; v < 4; v++) tiles.A.push(makeTile(o, state.scale, DPR, state.seed * 31 + v));
+    for (let v = 0; v < variants; v++) tiles.A.push(makeTile(o, state.scale, DPR, state.seed * 31 + v));
     if (state.repeat === 'checker')
       for (let v = 0; v < 3; v++) tiles.B.push(makeTile({ ...o, plain: true }, state.scale, DPR, state.seed * 37 + v));
     needTiles = false;

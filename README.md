@@ -83,9 +83,11 @@ tap. Drive it from your own controls through `wall.state` and
 
 ## The parts
 
-**`createWall(canvas, { palettes, motifs, painters, presets, material })`** returns
+**`createWall(canvas, { palettes, motifs, painters, presets, material, variants })`** returns
 the wall. `wall.state` holds `seed`, `repeat` (`module`, `rotate`,
-`single` or `checker`), `pal`, `motif`, `density` (1 to 5), `hand` (0 to
+`single`, `checker`, or `whole` for a tile that is a picture, every one
+laid the same way up; `variants` is how many paintings of the design
+such a wall draws from, four by default), `pal`, `motif`, `density` (1 to 5), `hand` (0 to
 1, how far the brush drifts), `brush` (line weight), `scale` (pixels per
 tile), `panX`, `panY`, `bands`, `grout` and `age`. After changing any of
 them call `wall.rebuild(true)` to repaint the tiles, or `wall.rebuild(false)`
