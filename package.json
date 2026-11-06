@@ -1,8 +1,8 @@
 {
   "name": "azulejeria",
-  "version": "2.3.1",
+  "version": "2.4.0",
   "description": "Tin-glazed tiles painted by rule. A seeded canvas engine for Spanish azulejo walls: a diagonal-symmetric design, brushwork that drifts, washes that pool, and four ways to repeat the tile.",
-  "keywords": ["canvas", "generative", "tiles", "azulejo", "mudejar", "sevilla", "pattern", "procedural", "art", "wallpaper", "interlace", "knotwork", "celtic", "mosaic", "voronoi", "trencadis"],
+  "keywords": ["canvas", "generative", "wallpaper-groups", "symmetry", "tiles", "azulejo", "mudejar", "sevilla", "pattern", "procedural", "art", "wallpaper", "interlace", "knotwork", "celtic", "mosaic", "voronoi", "trencadis"],
   "license": "MIT",
   "author": "Andy Cross",
   "homepage": "https://stepinto.dev/art/azulejeria.html",
@@ -13,11 +13,12 @@
     ".": "./src/azulejeria.js",
     "./knots": "./src/knots.js",
     "./pieces": "./src/pieces.js",
+    "./groups": "./src/groups.js",
     "./azulejeria.css": "./src/azulejeria.css"
   },
-  "files": ["src", "README.md", "LICENSE"],
+  "files": ["src", "test", "README.md", "LICENSE"],
   "sideEffects": false,
   "scripts": {
-    "test": "node --check src/azulejeria.js && node --check src/knots.js && node --check src/head.js && node --check src/pieces.js"
+    "test": "node --check src/azulejeria.js && node --check src/knots.js && node --check src/head.js && node --check src/pieces.js && node --check src/groups.js && node test/groups.mjs"
   }
 }

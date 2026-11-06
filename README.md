@@ -19,6 +19,8 @@ rosettes and Mudéjar strapwork), [Jerez](https://stepinto.dev/art/jerez.html)
 viewer, a canvas you paint any world into, with the drag, the pinch, the
 wheel and the page chrome; [Alicatado](https://stepinto.dev/art/alicatado.html)
 (cut tile set in lime) is the viewer with the cutter below,
+[Papel Pintado](https://stepinto.dev/art/papelpintado.html) is the wall laid
+by any of the seventeen wallpaper groups,
 [Trencadís](https://stepinto.dev/art/trencadis.html) is the viewer breaking
 Azulejería's tiles with it, and
 [Knotwork](https://stepinto.dev/art/knotwork.html) is the viewer with the knots. The design is
@@ -85,8 +87,9 @@ tap. Drive it from your own controls through `wall.state` and
 
 **`createWall(canvas, { palettes, motifs, painters, presets, material, variants })`** returns
 the wall. `wall.state` holds `seed`, `repeat` (`module`, `rotate`,
-`single`, `checker`, or `whole` for a tile that is a picture, every one
-laid the same way up; `variants` is how many paintings of the design
+`single`, `checker`, `whole` for a tile that is a picture, every one
+laid the same way up, or any of the seventeen wallpaper groups by name,
+`p1` to `p6m`, see Groups below; `variants` is how many paintings of the design
 such a wall draws from, four by default), `pal`, `motif`, `density` (1 to 5), `hand` (0 to
 1, how far the brush drifts), `brush` (line weight), `scale` (pixels per
 tile), `panX`, `panY`, `bands`, `grout` and `age`. After changing any of
@@ -224,6 +227,39 @@ lit or shaded by where it faces the light. **`grain(seed, size)`** is
 a small speckle tile for mortar. `centroid`, `signedArea`,
 `ensureCCW`, `regularPoly` and `pathPoly` are the small polygon maths
 every page wanted.
+
+## Groups
+
+`azulejeria/groups` is the seventeen ways a wall can repeat: the
+wallpaper groups, for [Papel Pintado](https://stepinto.dev/art/papelpintado.html)
+and for any wall that sets `state.repeat` to one of their names. Every
+repeating pattern in the plane has one of these symmetries, and each
+is given here as a lattice (two vectors, in tiles), a domain (the part
+of the tile that is drawn: the whole square, half of it cut on a
+diagonal, or the 60° rhombus corner to corner and its thirds, sixths
+and twelfths) and the copies, the isometries that lay the domain out
+inside one cell. Every domain keeps the design's main corner, so what
+gets repeated is the heart of the design.
+
+```js
+import { GROUPS, GROUP_NAMES, layGroup, drawTile } from 'azulejeria/groups';
+
+GROUP_NAMES;                       // ['p1', 'p2', 'pm', 'pg', 'cm', 'pmm', 'pmg', 'pgg', 'cmm', 'p4', 'p4m', 'p4g', 'p3', 'p3m1', 'p31m', 'p6', 'p6m']
+const g = GROUPS.p6m;              // { cell, domain, copies, lattice, note }
+layGroup(ctx, g, S, gap, W, H, ox, oy, (c, t) => drawTile(c, img, S, gap));
+```
+
+**`layGroup(ctx, group, S, gap, W, H, ox, oy, draw)`** walks every
+copy in every cell a window touches, with `S` the tile in pixels,
+`gap` the grout and the world's origin at `(ox, oy)`, and calls
+`draw(ctx, { i, j, k, grp, M })` with the context in design
+coordinates (the unit square, main corner at the origin) and clipped
+to the domain less half the gap. **`drawTile(ctx, img, S, gap)`** puts
+a tile image there. The matrices are plain `[a, b, c, d, e, f]`
+arrays with `mul`, `rotate(th, cx, cy)`, `reflect(ang, px, py)`,
+`translate` and `apply` beside them, and `inset(poly, d)` moves a
+convex polygon in by `d`. The wall's `createWall` uses all of this
+when `repeat` names a group, and `paintThumb` lays a card with it.
 
 ## Knots
 

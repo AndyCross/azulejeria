@@ -20,6 +20,13 @@
 // touching what is drawn on it: how the ground is laid, how a shape
 // is filled, how far a piece strays from the drawing, what the grout
 // is, and what age does. Without one the tile is tin-glazed.
+//
+// The wall's repeat is one of the four classic layings (module, rotate,
+// single, checker), the whole tile laid the same way up, or any of the
+// seventeen wallpaper groups, which live in groups.js.
+
+import { GROUPS, layGroup, drawTile } from './groups.js';
+export { GROUPS, GROUP_NAMES, layGroup, drawTile, inset } from './groups.js';
 
 // ------------------------------------------------------------- random ---
 export function mulberry32(a) {
@@ -331,10 +338,64 @@ export function tileOpts(cfg, s) {
   return { pal, design, quarter, hand: s.hand, brush: s.brush, painters: cfg.painters, material: cfg.material };
 }
 
+// what age does to a glazed tile, drawn in the tile's own frame: a
+// warm cast on some, a craze on a few, a chipped corner on fewer
+export function ageTile(ctx, rng, s, pal) {
+  if (rng() < 0.5) { ctx.fillStyle = `rgba(120, 85, 30, ${0.04 + rng() * 0.1})`; ctx.fillRect(-s / 2, -s / 2, s, s); }
+  if (rng() < 0.18) {
+    ctx.strokeStyle = 'rgba(60, 45, 30, 0.35)';
+    ctx.lineWidth = 0.7;
+    const pts = linePts(-s / 2, (rng() - 0.5) * s, s / 2, (rng() - 0.5) * s, s * 0.08, rng, 14);
+    trace(ctx, pts, false); ctx.stroke();
+    if (rng() < 0.5) {
+      const q = linePts((rng() - 0.5) * s, -s / 2, (rng() - 0.5) * s, s / 2, s * 0.08, rng, 14);
+      trace(ctx, q, false); ctx.stroke();
+    }
+  }
+  if (rng() < 0.05) {
+    const cxs = rng() < 0.5 ? -1 : 1, cys = rng() < 0.5 ? -1 : 1;
+    ctx.fillStyle = pal.grout;
+    ctx.beginPath();
+    ctx.moveTo(cxs * s / 2, cys * s / 2);
+    ctx.lineTo(cxs * (s / 2 - s * (0.08 + rng() * 0.1)), cys * s / 2);
+    ctx.lineTo(cxs * (s / 2 - s * 0.03), cys * (s / 2 - s * 0.05));
+    ctx.lineTo(cxs * s / 2, cys * (s / 2 - s * (0.08 + rng() * 0.1)));
+    ctx.closePath(); ctx.fill();
+  }
+}
+
+// a wall laid by a wallpaper group: every copy of the domain in every
+// cell the window touches, each straying from its place as the hand
+// allows, aged if asked. `pick(rng)` chooses the tile image.
+function layWall(ctx, grp, S, gap, W, H, ox, oy, state, pal, m, lay, pick) {
+  layGroup(ctx, grp, S, gap, W, H, ox, oy, (g, t) => {
+    const rng = mulberry32(hash2(t.i * 32 + t.k, t.j) + state.seed);
+    const img = pick(rng);
+    g.translate(0.5 + (rng() - 0.5) * lay.shift * state.hand, 0.5 + (rng() - 0.5) * lay.shift * state.hand);
+    g.rotate((rng() - 0.5) * lay.turn * state.hand);
+    g.translate(-0.5, -0.5);
+    drawTile(g, img, S, gap);
+    if (state.age) {
+      // age is drawn in pixels about the tile's centre
+      g.translate(0.5, 0.5); g.scale(1 / S, 1 / S);
+      const s = S - gap;
+      if (m.age) m.age(g, { i: t.i, j: t.j, k: t.k, rng, s, S, pal, state, cx: (t.i + 0.5) * S, cy: (t.j + 0.5) * S, fx: 1, fy: 1, rot: 0 });
+      else ageTile(g, rng, s, pal);
+    }
+  });
+}
+
 // a small wall of four tiles, for a preset card
 export function paintThumb(cfg, p, g, T, k) {
   const o = tileOpts(cfg, p);
   const A = makeTile(o, T, k, p.seed * 31);
+  const grp = GROUPS[p.repeat];
+  if (grp) {
+    g.fillStyle = o.pal.grout; g.fillRect(0, 0, 2 * T, 2 * T);
+    const m = cfg.material || {}, gap = p.grout === false ? 0 : (m.gapOf ? m.gapOf(T, p) : Math.max(1.2, T * 0.022));
+    layWall(g, grp, T, gap, 2 * T, 2 * T, 0, 0, { ...p, age: false }, o.pal, m, { shift: 0, turn: 0 }, () => A);
+    return;
+  }
   const B = p.repeat === 'checker' ? makeTile({ ...o, plain: true }, T, k, p.seed * 37) : null;
   g.fillStyle = o.pal.grout; g.fillRect(0, 0, 2 * T, 2 * T);
   for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) {
@@ -498,7 +559,7 @@ export function createWall(canvas, cfg) {
   const wall = createViewer(canvas, { paint, scale: 120, minZoom: 40, maxZoom: 260 });
   const state = Object.assign(wall.state, {
     seed: 1,
-    repeat: 'module',   // module | rotate | single | checker
+    repeat: 'module',   // module | rotate | single | checker | whole | a wallpaper group
     pal: Object.keys(palettes)[0],
     motif: firstMotif,
     density: 3,         // how much of the design is drawn, 1..5
@@ -533,6 +594,13 @@ export function createWall(canvas, cfg) {
 
     const S = state.scale;
     const gap = state.grout ? (m.gapOf ? m.gapOf(S, state) : Math.max(1.2, S * 0.022)) : 0;
+    const grp = GROUPS[state.repeat];
+    if (grp) {
+      layWall(ctx, grp, S, gap, W, H, ox, oy, state, pal, m, lay, rng => tiles.A[Math.floor(rng() * tiles.A.length)]);
+      if (m.finish) m.finish(ctx, W, H, state, pal);
+      else if (state.age) { ctx.fillStyle = 'rgba(90, 60, 20, 0.05)'; ctx.fillRect(0, 0, W, H); }
+      return;
+    }
     const i0 = Math.floor(-ox / S) - 1, i1 = Math.ceil((W - ox) / S) + 1;
     const j0 = Math.floor(-oy / S) - 1, j1 = Math.ceil((H - oy) / S) + 1;
     const s = S - gap;
@@ -553,28 +621,7 @@ export function createWall(canvas, cfg) {
         if (state.age && m.age) {
           m.age(ctx, { i, j, rng, s, S, pal, state, cx: (i + 0.5) * S, cy: (j + 0.5) * S, fx, fy, rot });
         } else if (state.age) {
-          // a warm cast on some, a craze on a few, a chipped corner on fewer
-          if (rng() < 0.5) { ctx.fillStyle = `rgba(120, 85, 30, ${0.04 + rng() * 0.1})`; ctx.fillRect(-s / 2, -s / 2, s, s); }
-          if (rng() < 0.18) {
-            ctx.strokeStyle = 'rgba(60, 45, 30, 0.35)';
-            ctx.lineWidth = 0.7;
-            const pts = linePts(-s / 2, (rng() - 0.5) * s, s / 2, (rng() - 0.5) * s, s * 0.08, rng, 14);
-            trace(ctx, pts, false); ctx.stroke();
-            if (rng() < 0.5) {
-              const q = linePts((rng() - 0.5) * s, -s / 2, (rng() - 0.5) * s, s / 2, s * 0.08, rng, 14);
-              trace(ctx, q, false); ctx.stroke();
-            }
-          }
-          if (rng() < 0.05) {
-            const cxs = rng() < 0.5 ? -1 : 1, cys = rng() < 0.5 ? -1 : 1;
-            ctx.fillStyle = pal.grout;
-            ctx.beginPath();
-            ctx.moveTo(cxs * s / 2, cys * s / 2);
-            ctx.lineTo(cxs * (s / 2 - s * (0.08 + rng() * 0.1)), cys * s / 2);
-            ctx.lineTo(cxs * (s / 2 - s * 0.03), cys * (s / 2 - s * 0.05));
-            ctx.lineTo(cxs * s / 2, cys * (s / 2 - s * (0.08 + rng() * 0.1)));
-            ctx.closePath(); ctx.fill();
-          }
+          ageTile(ctx, rng, s, pal);
         }
         ctx.restore();
       }
