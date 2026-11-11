@@ -185,6 +185,17 @@ edge across the far corner, which four tiles close into a ring or a
 diamond), `ring` (a scalloped ring around the main corner), `lattice` (a
 line edge to edge that mirrors into a lozenge net) and `dots`.
 
+**A border round a corner**: `bendCorner(strip, fill)` takes a square
+tile painted as a run of border (outside along the top, inside along
+the bottom, the design meeting itself left and right) and returns the
+corner tile: the strip bent through a quarter turn about its inner
+corner, so the vine or the scroll turns the corner and meets the strip
+on both sides. `fill(g, size)`, if given, paints the outer corner the
+bend does not reach. [Azulejos de letras](https://stepinto.dev/art/letras.html)
+uses it for the frame of a street plaque. `mitreCorner(strip)` is the
+square alternative: the strip cut on the diagonal and laid both ways,
+as a run of border tiles is mitred at forty-five degrees.
+
 **The lower level** is there if you want it: `makeDesign(seed, density,
 bands, bold, motif)`, `paintDesign(g, els, pal, hand, lw, seed, painters, material, brush)`,
 `makeTile(opts, size, pixelRatio, seed)`, `tileOpts(cfg, state)` and

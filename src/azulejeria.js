@@ -364,6 +364,65 @@ export function ageTile(ctx, rng, s, pal) {
   }
 }
 
+// A border tile bent round a corner. `strip` is a square tile painted
+// as a run of border: the outside of the wall along its top edge, the
+// inside along its bottom, the design meeting itself at left and
+// right. The corner is the quarter-annulus about the tile's inner
+// corner: distance from that corner becomes how far in the design
+// sits, and the angle round it becomes how far along, so the strip's
+// right edge becomes the corner's right edge, its left edge the
+// corner's bottom edge, and the design turns through a quarter between
+// them. Where the annulus does not reach, the outer corner, `fill(g)`
+// paints the ground (the glaze by default, sampled from the strip's
+// own corner). The result joins the strip laid to its right unturned
+// and laid below it turned three quarters; the other three corners are
+// this one turned.
+export function bendCorner(strip, fill) {
+  const N = strip.width;
+  const c = document.createElement('canvas');
+  c.width = c.height = N;
+  const g = c.getContext('2d');
+  if (fill) fill(g, N);
+  else { g.drawImage(strip, 0, 0, 2, 2, 0, 0, N, N); }
+  const src = strip.getContext('2d').getImageData(0, 0, N, N).data;
+  const out = g.getImageData(0, 0, N, N), d = out.data;
+  const Q = Math.PI / 2;
+  for (let py = 0; py < N; py++) for (let px = 0; px < N; px++) {
+    const u = 1 - (px + 0.5) / N, v = 1 - (py + 0.5) / N;
+    const r = Math.hypot(u, v);
+    if (r > 1) continue;
+    const along = Math.atan2(u, v) / Q, inward = 1 - r;
+    // bilinear sample of the strip at (along, inward)
+    const sx = Math.min(N - 1.001, Math.max(0, along * N - 0.5)), sy = Math.min(N - 1.001, Math.max(0, inward * N - 0.5));
+    const x0 = Math.floor(sx), y0 = Math.floor(sy), fx = sx - x0, fy = sy - y0;
+    const i = (py * N + px) * 4;
+    for (let ch = 0; ch < 4; ch++) {
+      const a = src[(y0 * N + x0) * 4 + ch], b = src[(y0 * N + x0 + 1) * 4 + ch];
+      const cc = src[((y0 + 1) * N + x0) * 4 + ch], dd = src[((y0 + 1) * N + x0 + 1) * 4 + ch];
+      d[i + ch] = (a * (1 - fx) + b * fx) * (1 - fy) + (cc * (1 - fx) + dd * fx) * fy;
+    }
+  }
+  g.putImageData(out, 0, 0);
+  return c;
+}
+
+// The same strip mitred instead: the corner is cut on the diagonal
+// from the outer corner to the inner one, the strip laid unturned
+// above the cut and turned three quarters below it, the way a picture
+// frame or a run of border tiles is cut at forty-five degrees. It joins
+// the same neighbours as bendCorner's.
+export function mitreCorner(strip) {
+  const N = strip.width;
+  const c = document.createElement('canvas');
+  c.width = c.height = N;
+  const g = c.getContext('2d');
+  g.save(); g.beginPath(); g.moveTo(0, 0); g.lineTo(N, 0); g.lineTo(N, N); g.closePath(); g.clip();
+  g.drawImage(strip, 0, 0); g.restore();
+  g.save(); g.beginPath(); g.moveTo(0, 0); g.lineTo(0, N); g.lineTo(N, N); g.closePath(); g.clip();
+  g.translate(N / 2, N / 2); g.rotate(3 * Math.PI / 2); g.drawImage(strip, -N / 2, -N / 2); g.restore();
+  return c;
+}
+
 // a wall laid by a wallpaper group: every copy of the domain in every
 // cell the window touches, each straying from its place as the hand
 // allows, aged if asked. `pick(rng)` chooses the tile image.
