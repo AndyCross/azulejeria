@@ -6,7 +6,8 @@
   "license": "MIT",
   "author": "Andy Cross",
   "homepage": "https://stepinto.dev/art/azulejeria.html",
-  "repository": { "type": "git", "url": "git+https://github.com/AndyCross/mcp-blogs.git", "directory": "packages/azulejeria" },
+  "repository": { "type": "git", "url": "git+https://github.com/AndyCross/azulejeria.git" },
+  "bugs": { "url": "https://github.com/AndyCross/azulejeria/issues" },
   "type": "module",
   "main": "./src/azulejeria.js",
   "exports": {
