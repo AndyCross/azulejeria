@@ -1,8 +1,8 @@
 {
   "name": "azulejeria",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "description": "Tin-glazed tiles painted by rule. A seeded canvas engine for Spanish azulejo walls: a diagonal-symmetric design, brushwork that drifts, washes that pool, and four ways to repeat the tile.",
-  "keywords": ["canvas", "generative", "wallpaper-groups", "symmetry", "tiles", "azulejo", "mudejar", "sevilla", "pattern", "procedural", "art", "wallpaper", "interlace", "knotwork", "celtic", "mosaic", "voronoi", "trencadis", "drawing", "print"],
+  "keywords": ["canvas", "generative", "wallpaper-groups", "symmetry", "tiles", "azulejo", "mudejar", "sevilla", "pattern", "procedural", "art", "wallpaper", "interlace", "knotwork", "celtic", "mosaic", "voronoi", "trencadis", "drawing", "print", "shadow", "weaving", "tartan", "loom"],
   "license": "MIT",
   "author": "Andy Cross",
   "homepage": "https://stepinto.dev/art/azulejeria.html",
@@ -16,11 +16,13 @@
     "./pieces": "./src/pieces.js",
     "./groups": "./src/groups.js",
     "./draw": "./src/draw.js",
+    "./shadow": "./src/shadow.js",
+    "./loom": "./src/loom.js",
     "./azulejeria.css": "./src/azulejeria.css"
   },
   "files": ["src", "test", "README.md", "LICENSE"],
   "sideEffects": false,
   "scripts": {
-    "test": "node --check src/azulejeria.js && node --check src/knots.js && node --check src/head.js && node --check src/pieces.js && node --check src/groups.js && node --check src/draw.js && node test/groups.mjs && node test/draw.mjs"
+    "test": "node --check src/azulejeria.js && node --check src/knots.js && node --check src/head.js && node --check src/pieces.js && node --check src/groups.js && node --check src/draw.js && node --check src/shadow.js && node --check src/loom.js && node test/groups.mjs && node test/draw.mjs && node test/loom.mjs"
   }
 }

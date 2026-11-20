@@ -28,6 +28,8 @@ written up [here](https://stepinto.dev/posts/tiles-painted-by-rule/) and
 [here](https://stepinto.dev/posts/cut-tile-and-poured-cement/).
 [Octavo](https://stepinto.dev/art/octavo.html) is the wall with a pad beside it: you draw one eighth of
 the tile and the wall paints the rest (see Draw below).
+[Jali](https://stepinto.dev/art/jali.html) is a pierced stone screen lit by the sun in Shadow below,
+and [Tartan](https://stepinto.dev/art/tartan.html) is the Loom: type a sett, get the cloth.
 
 ```
 npm install azulejeria
@@ -390,6 +392,71 @@ mirrored out past each edge. The file carries its dpi (a `pHYs` chunk;
 right size. `mountPanel` wires it to a `#order` button when the page has
 one (`opts.print` is passed on); with `mountChrome`, pass
 `order: () => exportTile(wall)` in the spec.
+
+## Shadow
+
+`azulejeria/shadow` is a sun that goes round and the shadows it casts.
+Nothing is drawn in shadow: a caster's shadow is its own outline, moved
+along the sun's slant by how far it stands off the surface, with what
+must stay lit cut back out, softened and multiplied on in the colour of
+the sky.
+
+```js
+import { sunOf, castShadow, shadowLayer } from 'azulejeria/shadow';
+
+const sun = sunOf(9.5);          // 6 to 20; the wall faces south
+castShadow(g, {
+  w, h, dpr, shade: sun.shade, alpha: 0.8, blur: 2,
+  cast: lg => { lg.setTransform(...); drawGrille(lg, sun.slant[0] * d, sun.slant[1] * d); },
+  cut: lg => drawGrille(lg, 0, 0),
+});
+```
+
+**`sunOf(hour, { reach })`** gives `slant` (how far along the wall a
+point one unit proud throws its shadow, x right and y down, never
+longer than `reach`), `dir` (the unit vector toward the sun), `light`
+(how squarely it strikes the face), `warm` (1 at the horizon, 0 at the
+top of the day), `sunCol` and `shade` as `[r, g, b]`, and `az` and `e`
+for a page with its own projection. **`castShadow(g, o)`** clears a
+kept layer the size of the window, lets `o.cast(lg)` draw the caster
+where its shadow falls (fill and stroke are already `o.shade`), draws
+`o.cut(lg)` with destination-out if there is one, and multiplies the
+layer onto `g` at `o.alpha`, blurred by `o.blur` device pixels.
+`o.layer` picks which kept layer, for a page that casts more than once.
+**`shadowLayer(n, pw, ph)`** is one of those layers, for a page's own
+compositing.
+
+## Loom
+
+`azulejeria/loom` is cloth by rule. A draft is three lists: the shaft
+each warp end is threaded through, the shafts each treadle lifts, and
+the treadle pressed for each pick. Where an end's shaft is lifted the
+warp is on top. A sett is a string of colours and thread counts, and
+the cloth shows a thread's colour wherever that thread is on top.
+
+```js
+import { DRAFTS, parseSett, threadsOf, dyeOf, clothCanvas, threadTile } from 'azulejeria/loom';
+
+const threads = threadsOf(parseSett('K4 R24 K24 Y4')).map(c => dyeOf(c, 'modern'));
+const cloth = clothCanvas(400, 300, 0, 0, threads, threads, DRAFTS.twill);   // one pixel a crossing
+```
+
+**`DRAFTS`** has `plain`, `twill` (2/2), `drill` (3/1), `herringbone`,
+`diamond` and `basket`; a draft is `{ threading, tieup, treadling }`,
+so write your own. **`lifted(draft, i, j)`** is the rule and
+**`drawdown(draft)`** one repeat of it. **`parseSett(text)`** reads
+colour codes (K R G B Y W N P O T A M C, with L or D in front for light
+and dark, or `#rrggbb`) and counts, slashes at the pivots allowed; the
+sett turns back at both ends unless it has `...` in it.
+**`threadsOf(sett)`** is one repeat, a code per thread, and
+**`writeSett(sett)`** writes it back as a threadcount.
+**`dyeOf(code, dye)`** is the colour in a dye lot (**`DYES`**: `modern`,
+`ancient`, `weathered`, or your own map). **`weavePixels(data, w, h,
+i0, j0, warp, weft, draft, under)`** fills RGBA pixels, one a crossing,
+from end `i0` and pick `j0`, and needs no document;
+**`clothCanvas(...)`** is the same as a canvas to draw scaled up, and
+**`threadTile(draft, t)`** is the threads' own shading, one repeat at
+`t` pixels a thread, to lay over it.
 
 ## Licence
 
