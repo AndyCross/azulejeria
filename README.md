@@ -26,6 +26,8 @@ Azulejería's tiles with it, and
 [Knotwork](https://stepinto.dev/art/knotwork.html) is the viewer with the knots. The design is
 written up [here](https://stepinto.dev/posts/tiles-painted-by-rule/) and
 [here](https://stepinto.dev/posts/cut-tile-and-poured-cement/).
+[Octavo](https://stepinto.dev/art/octavo.html) is the wall with a pad beside it: you draw one eighth of
+the tile and the wall paints the rest (see Draw below).
 
 ```
 npm install azulejeria
@@ -328,6 +330,66 @@ A beast's head is traced from a drawing of an Insular hound's head
 0.55 of the ribbon) and lies along the cut facing the other end, which
 hooks round under it and into its jaws. `eye` colours its eye.
 `strandPath` and `ribbon` are exported for drawing a strand yourself.
+
+## Draw
+
+```js
+import { drawnMotif, DRAW_PAINTERS, mountPad, encodeDrawing, decodeDrawing } from 'azulejeria/draw';
+
+const wall = createWall(canvas, {
+  palettes, presets,
+  motifs: { drawn: drawnMotif() },
+  painters: { ...PAINTERS, ...DRAW_PAINTERS },
+});
+mountPanel(wall, { fileName: 'mine' });
+mountPad(wall, { onEdit: d => history.replaceState(null, '', '?d=' + d) });
+```
+
+A tile painted by hand, one eighth of it. Every design is symmetric
+across the diagonal of its square, so a hand only has to draw the
+triangle under that diagonal, from the main corner to the far one. The
+wall is an ordinary wall: the drawing is its motif, so the repeats, the
+groups, the palettes, the brush and any material apply to it.
+[Octavo](https://stepinto.dev/art/octavo.html) is this and nothing else.
+
+A drawing is a list of strokes `{ k, c, w, pts }`: the kind (`line`,
+`shape` or `dot`), the colour (0 the wash, 1 to 3 an accent, 4 the ink),
+the weight (1 to 8) and the points in design coordinates.
+**`encodeDrawing(strokes)`** packs it into a short string, two bytes a
+point, base64url; **`decodeDrawing(string)`** reads it back and gives an
+empty drawing for anything it cannot read. The string lives in the
+wall's state (`state.d` unless you name another key), so a preset can
+carry a drawing and so can a query string or a stored value.
+
+**`drawnMotif(key)`** is the motif that paints `state[key]`. A motif's
+context now carries `state` for this. **`DRAW_PAINTERS`** has the one
+painter it needs, `stroke`, which paints each stroke on its own side of
+the diagonal and again reflected, with the same drift and the same
+brush, so a petal drawn across the diagonal comes out whole. A shape is
+washed and inked, an ink line is a line, a coloured line is a ribbon. A
+material's `shape`, `line` and `dot` are used when it has them.
+
+**`mountPad(wall, { key, onEdit })`** wires the pad. The page provides
+`#pad` holding a canvas `#padCanvas`, buttons `.tool[data-tool]`
+(`line`, `shape`, `dot`), an empty `#swatches`, a range `#weight` with
+`#weightVal`, buttons `#undo` and `#clear`, and `#padHead` with
+`#padToggle`; `azulejeria.css` styles them. The pad shows the square in
+the wall's palette and material with the reflected half dimmed. A
+stroke drawn on the dimmed side is reflected over. The wall repaints
+while the pen moves. Cmd or Ctrl Z undoes. **`settle(stroke)`**,
+**`simplify(pts, eps)`** and **`smooth(pts, closed, times)`** are what
+the pad does to a raw stroke, exported for a page with its own input.
+
+## Print
+
+**`exportTile(wall, { cm, dpi, bleed })`** paints the wall's tile once
+at print size and resolves to a PNG blob: 15 cm at 300 dpi with a 3 mm
+bleed unless told otherwise (1842 pixels square). The bleed is the tile
+mirrored out past each edge. The file carries its dpi (a `pHYs` chunk;
+**`pngWithDpi(bytes, dpi)`** does that to any PNG), so it opens at the
+right size. `mountPanel` wires it to a `#order` button when the page has
+one (`opts.print` is passed on); with `mountChrome`, pass
+`order: () => exportTile(wall)` in the spec.
 
 ## Licence
 

@@ -49,8 +49,10 @@ export function hexA(hex, a) {
 // elements, each `{ t: 'painterName', ...params }`. The context carries
 // the seeded rng and a few helpers every motif wants: `pick` one of a
 // list, `role` (wash or one of the accents), and `dots` for the
-// scatter that higher densities add.
-export function makeDesign(seed, density, bands, bold, motif) {
+// scatter that higher densities add. `state`, if given, is the wall's
+// state, for a motif that paints something the state carries (a
+// drawing, say) rather than what the seed grows.
+export function makeDesign(seed, density, bands, bold, motif, state) {
   const rng = mulberry32(seed);
   bold = bold || 1;                       // single tiles carry the motif larger
   const pick = arr => arr[Math.floor(rng() * arr.length)];
@@ -63,7 +65,7 @@ export function makeDesign(seed, density, bands, bold, motif) {
     }
     return { t: 'dots', dots: d };
   };
-  return motif({ rng, density, bands, bold, pick, role, dots });
+  return motif({ rng, density, bands, bold, pick, role, dots, state });
 }
 
 // ---------------------------------------------------------- brushwork ---
@@ -235,7 +237,7 @@ export function paintDesign(g, els, pal, hand, lw, jseed, painters, material, br
   const amp = m.ampOf ? m.ampOf(hand) : 0.012 * hand;
   const Q = Math.PI / 2, D = Q / 2;
   const dc = Math.cos(D), ds = Math.sin(D);       // the diagonal
-  const b = { g, pal, lw, amp, rng, Q, D, dc, ds, col: pal.wash, hand, brush: brush === undefined ? 1 : brush };
+  const b = { g, pal, lw, amp, rng, Q, D, dc, ds, col: pal.wash, hand, brush: brush === undefined ? 1 : brush, material: material || null };
   const shape = m.shape
     ? (pts, col) => m.shape(g, pts, col, b)
     : (pts, col) => { wash(g, pts, col, rng); ink(g, pts, lw, pal, rng, true); };
@@ -334,7 +336,7 @@ const ROT = [0, Math.PI / 2, 3 * Math.PI / 2, Math.PI];
 export function tileOpts(cfg, s) {
   const pal = cfg.palettes[s.pal];
   const quarter = s.repeat === 'single' || s.repeat === 'checker';
-  const design = makeDesign(s.seed, s.density, s.bands, quarter ? 1.35 : 1, cfg.motifs[s.motif]);
+  const design = makeDesign(s.seed, s.density, s.bands, quarter ? 1.35 : 1, cfg.motifs[s.motif], s);
   return { pal, design, quarter, hand: s.hand, brush: s.brush, painters: cfg.painters, material: cfg.material };
 }
 
@@ -466,6 +468,78 @@ export function paintThumb(cfg, p, g, T, k) {
     g.drawImage(img, -T / 2 + 1, -T / 2 + 1, T - 2, T - 2);
     g.restore();
   }
+}
+
+// -------------------------------------------------------------- print ---
+// exportTile(wall, { cm, dpi, bleed }) paints the wall's tile once at
+// print size, for someone to have it made: 15 cm at 300 dpi by default
+// (1772 pixels), with a bleed of 3 mm all round. The bleed is the tile
+// mirrored out past each edge, which is what its neighbour is in the
+// module and close enough under the other repeats for a cutter's
+// tolerance. It resolves to a PNG blob that says its own dpi, so it
+// opens at the right size. A checker exports its painted tile.
+export function exportTile(wall, opts) {
+  opts = opts || {};
+  const cm = opts.cm || 15, dpi = opts.dpi || 300, bleedMm = opts.bleed === undefined ? 3 : opts.bleed;
+  const px = Math.round(cm / 2.54 * dpi), bl = Math.round(bleedMm / 25.4 * dpi);
+  const cfg = { palettes: wall.palettes, motifs: wall.motifs, painters: wall.painters, material: wall.material };
+  const tile = makeTile(tileOpts(cfg, wall.state), px, 1, wall.state.seed * 31);
+  const c = document.createElement('canvas');
+  c.width = c.height = px + 2 * bl;
+  const g = c.getContext('2d');
+  for (const fy of [-1, 0, 1]) for (const fx of [-1, 0, 1]) {
+    if ((fx || fy) && !bl) continue;
+    g.save();
+    g.translate(bl + px / 2 + fx * px, bl + px / 2 + fy * px);
+    g.scale(fx ? -1 : 1, fy ? -1 : 1);
+    g.drawImage(tile, -px / 2, -px / 2);
+    g.restore();
+  }
+  return new Promise((resolve, reject) => c.toBlob(blob => {
+    if (!blob) { reject(new Error('the tile could not be encoded')); return; }
+    blob.arrayBuffer().then(buf => resolve(new Blob([pngWithDpi(new Uint8Array(buf), dpi)], { type: 'image/png' })), reject);
+  }, 'image/png'));
+}
+
+let CRC_TABLE = null;
+export function crc32(bytes) {
+  if (!CRC_TABLE) {
+    CRC_TABLE = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      CRC_TABLE[n] = c >>> 0;
+    }
+  }
+  let c = 0xffffffff;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 255] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+// a PNG's bytes with a pHYs chunk saying `dpi`, replacing one it has
+export function pngWithDpi(png, dpi) {
+  const ppm = Math.round(dpi / 0.0254);
+  const chunk = new Uint8Array(21), v = new DataView(chunk.buffer);
+  v.setUint32(0, 9);
+  chunk.set([112, 72, 89, 115], 4);              // pHYs
+  v.setUint32(8, ppm); v.setUint32(12, ppm);
+  chunk[16] = 1;                                 // per metre
+  v.setUint32(17, crc32(chunk.subarray(4, 17)));
+  const dv = new DataView(png.buffer, png.byteOffset, png.byteLength);
+  let at = 8, after = 33;                        // the signature, then IHDR
+  while (at + 8 <= png.length) {
+    const len = dv.getUint32(at), type = String.fromCharCode(...png.subarray(at + 4, at + 8));
+    if (type === 'pHYs') {
+      const out = new Uint8Array(png.length - (len + 12) + 21);
+      out.set(png.subarray(0, at)); out.set(chunk, at); out.set(png.subarray(at + len + 12), at + 21);
+      return out;
+    }
+    if (type === 'IDAT' || type === 'IEND') break;
+    at += len + 12;
+  }
+  const out = new Uint8Array(png.length + 21);
+  out.set(png.subarray(0, after)); out.set(chunk, after); out.set(png.subarray(after), after + 21);
+  return out;
 }
 
 // ------------------------------------------------------------- viewer ---
@@ -741,8 +815,10 @@ export function createWall(canvas, cfg) {
 // query string sets it; `change(value)` is what to do after. Then
 // `newId` and `onNew` for the button that starts over, `mood(state)`
 // for the line under it, `query(q)` for anything else in the query
-// string, `fileName` and `suffix(state)` for the saved png, and
-// `ready()` once everything is applied.
+// string, `fileName` and `suffix(state)` for the saved png,
+// `order(state)` (a promise of a blob) for the `#order` button that
+// saves one tile at print size, and `ready()` once everything is
+// applied.
 export function mountChrome(viewer, spec) {
   const doc = spec.document || document;
   const $ = id => doc.getElementById(id);
@@ -804,14 +880,23 @@ export function mountChrome(viewer, spec) {
   const on = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
   if (spec.onNew) on(spec.newId || 'newDesign', 'click', () => { spec.onNew(); sync(); });
 
-  on('save', 'click', () => {
-    viewer.canvas.toBlob(blob => {
-      const a = doc.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = (spec.fileName || 'wall') + '-' + (spec.suffix ? spec.suffix(state) : state.seed) + '.png';
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-    });
+  const download = (blob, tail) => {
+    const a = doc.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (spec.fileName || 'wall') + '-' + tail + (spec.suffix ? spec.suffix(state) : state.seed) + '.png';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  };
+  on('save', 'click', () => viewer.canvas.toBlob(blob => download(blob, '')));
+  if (spec.order) on('order', 'click', () => {
+    const btn = $('order'), label = btn.textContent;
+    btn.disabled = true; btn.textContent = 'painting the tile…';
+    // let the button say so before the paint holds the page
+    setTimeout(() => Promise.resolve()
+      .then(() => spec.order(state))
+      .then(blob => download(blob, 'tile-'))
+      .catch(e => console.error(e))
+      .finally(() => { btn.disabled = false; btn.textContent = label; }), 30);
   });
 
   const panel = $('panel');
@@ -868,7 +953,8 @@ export function mountChrome(viewer, spec) {
 // tile wall's controls: selects `repeat`, `motif` and `palette`; ranges
 // `density`, `hand`, `brush` and `zoom` with `densityVal`, `handVal`,
 // `brushVal` and `zoomVal` beside them; checkboxes `bands`, `grout` and
-// `age`; the `newDesign` button. The query string takes ?preset=,
+// `age`; the `newDesign` button; the `order` button, which saves one
+// tile at print size (`opts.print` is passed to `exportTile`). The query string takes ?preset=,
 // ?seed=, ?repeat=, ?pal=, ?motif=, ?density=, ?hand=, ?zoom=, ?bands=0
 // and ?age=1.
 export function mountPanel(wall, opts) {
@@ -897,6 +983,7 @@ export function mountPanel(wall, opts) {
     mood: s => 'design nº ' + s.seed,
     query: q => { if (q.has('seed')) { state.seed = parseInt(q.get('seed'), 10) || state.seed; wall.preset = ''; } },
     fileName: opts.fileName,
+    order: () => exportTile(wall, opts.print),
     ready: tiles,
   });
 }
