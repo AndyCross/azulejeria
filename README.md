@@ -10,26 +10,60 @@ a polyline with a slow wobble along its normal, the way a loaded brush
 drifts. Washes are laid thin twice so the glaze pools. Each tile gets its
 own mottled glaze, a slight turn, a slight shift, and a few of them craze.
 
-This package is the engine. You bring the motifs, the palettes and the
-presets, and, if the tile is not glazed, a material. Three walls built on
-it: [Azulejería](https://stepinto.dev/art/azulejeria.html) (Talavera
-rosettes and Mudéjar strapwork), [Jerez](https://stepinto.dev/art/jerez.html)
-(vines, horses and sherry) and [Hidráulico](https://stepinto.dev/art/hidraulico.html)
-(pigmented cement, pressed rather than painted). Underneath the wall is a
-viewer, a canvas you paint any world into, with the drag, the pinch, the
-wheel and the page chrome; [Alicatado](https://stepinto.dev/art/alicatado.html)
-(cut tile set in lime) is the viewer with the cutter below,
-[Papel Pintado](https://stepinto.dev/art/papelpintado.html) is the wall laid
-by any of the seventeen wallpaper groups,
-[Trencadís](https://stepinto.dev/art/trencadis.html) is the viewer breaking
-Azulejería's tiles with it, and
-[Knotwork](https://stepinto.dev/art/knotwork.html) is the viewer with the knots. The design is
-written up [here](https://stepinto.dev/posts/tiles-painted-by-rule/) and
+This package is the engine. It started as that one wall and is now a
+small kit for pattern made by rule and painted to look like a material.
+You bring the motifs, the palettes and the presets, and, if the tile is
+not glazed, a material.
+
+## What is in it
+
+| Import | What it is | Section |
+|---|---|---|
+| `azulejeria` | The tile wall, the viewer it is built on, the panel and page chrome, the brush and its geometry, corner tiles for borders, one tile at print size | A wall in forty lines, The parts, Print |
+| `azulejeria/pieces` | The cutter: a polygon inset, shifted, turned and bevelled, and a Voronoi for things that are broken | Pieces |
+| `azulejeria/groups` | The seventeen wallpaper groups as a way to lay any tile | Groups |
+| `azulejeria/knots` | Interlace on a grid: over and under by parity, breaks, cuts and beasts | Knots |
+| `azulejeria/draw` | A tile drawn by hand, one eighth of it, carried in a string | Draw |
+| `azulejeria/shadow` | A sun that goes round and the shadows it casts | Shadow |
+| `azulejeria/loom` | Weaving drafts, setts and the cloth they make | Loom |
+| `azulejeria/azulejeria.css` | The styles for the panel, the cards, the title and the pad | The parts |
+
+Each module stands alone except `draw`, which paints with the wall's
+brush. `knots`, `groups`, `pieces`, `shadow` and `loom` draw on any 2D
+context.
+
+## Built on it
+
+Tile walls (`createWall`):
+[Azulejería](https://stepinto.dev/art/azulejeria.html) (Talavera rosettes and Mudéjar strapwork),
+[Jerez](https://stepinto.dev/art/jerez.html) (vines, horses and sherry),
+[Hidráulico](https://stepinto.dev/art/hidraulico.html) (pigmented cement, pressed and not painted),
+[Delft](https://stepinto.dev/art/delft.html) (a figure in the middle of every tile),
+[Fajalauza](https://stepinto.dev/art/fajalauza.html) (Granada's green and blue on cream),
+[Rosa y Granada](https://stepinto.dev/art/rosaygranada.html) and
+[Encaustic](https://stepinto.dev/art/encaustic.html) (clay inlaid in clay, medieval and Victorian),
+[Papel Pintado](https://stepinto.dev/art/papelpintado.html) (block-printed paper laid by any of the seventeen groups) and
+[Octavo](https://stepinto.dev/art/octavo.html) (you draw one eighth of the tile and the wall paints the rest).
+
+Other worlds on the viewer (`createViewer`):
+[Alicatado](https://stepinto.dev/art/alicatado.html) (cut tile set in lime, with the cutter),
+[Trencadís](https://stepinto.dev/art/trencadis.html) (Azulejería's tiles broken and relaid),
+[Sutton Hoo](https://stepinto.dev/art/suttonhoo.html) (garnet cells through the cutter, a buckle in knots),
+[Knotwork](https://stepinto.dev/art/knotwork.html) (insular interlace on vellum),
+[Sebka](https://stepinto.dev/art/sebka.html) (a brick lattice under a sun you can move),
+[Rejería](https://stepinto.dev/art/rejeria.html) (wrought iron and its shadow on whitewash),
+[Jali](https://stepinto.dev/art/jali.html) (a pierced stone screen and the light it lets onto the floor),
+[Tartan](https://stepinto.dev/art/tartan.html) (type a sett, get the cloth),
+[Hitomezashi](https://stepinto.dev/art/hitomezashi.html) (two words stitched as rows and columns),
+[Azulejos de letras](https://stepinto.dev/art/letras.html) (a street-sign typeface, with borders that turn the corner),
+[Mantón de Manila](https://stepinto.dev/art/manton.html) (embroidered silk),
+[Hispania](https://stepinto.dev/art/hispania.html) (Roman pavements) and
+[Leonor](https://stepinto.dev/art/leonor.html) (heraldry from a blazon).
+
+The designs are written up in the
+[Patterns by Rule](https://stepinto.dev/patterns/) posts, starting
+[here](https://stepinto.dev/posts/tiles-painted-by-rule/) and
 [here](https://stepinto.dev/posts/cut-tile-and-poured-cement/).
-[Octavo](https://stepinto.dev/art/octavo.html) is the wall with a pad beside it: you draw one eighth of
-the tile and the wall paints the rest (see Draw below).
-[Jali](https://stepinto.dev/art/jali.html) is a pierced stone screen lit by the sun in Shadow below,
-and [Tartan](https://stepinto.dev/art/tartan.html) is the Loom: type a sett, get the cloth.
 
 ```
 npm install azulejeria
@@ -100,7 +134,8 @@ tile), `panX`, `panY`, `bands`, `grout` and `age`. After changing any of
 them call `wall.rebuild(true)` to repaint the tiles, or `wall.rebuild(false)`
 for things the wall draws itself (pan, grout, age). `wall.applyPreset(name)`,
 `wall.newDesign()` and `wall.zoomAt(x, y, factor)` do what they say. Set
-`wall.onChange(kind)` to be told about them.
+`wall.onChange(kind)` to be told about them (`'preset'`, `'design'`,
+`'zoom'`). **`REPEATS`** lists the five classic repeats by name.
 
 **A material** changes what the tile is made of without touching what is
 drawn on it. It is an object of optional hooks, and without one the tile
@@ -120,19 +155,22 @@ centre `cx`, `cy`, so wear can follow the line people walk. `finish(ctx,
 W, H, state, pal)` is drawn over the whole wall last. None of the hooks
 read the design's rng, so a material never moves a design.
 
-**`mountPanel(wall, { fileName, defaultPreset })`** wires the standard
+**`mountPanel(wall, { fileName, defaultPreset, print, document })`** wires the standard
 panel for a wall. It is `mountChrome` (below) with the wall's controls,
 which are a handful of elements found by id: selects `repeat`,
 `motif` and `palette`; ranges `density`, `hand`, `brush` and `zoom` with
 `densityVal`, `handVal`, `brushVal` and `zoomVal` spans beside them;
-checkboxes `bands`, `grout` and `age`; buttons `newDesign` and `save`;
+checkboxes `bands`, `grout` and `age`; buttons `newDesign`, `save` and
+`order` (one tile at print size, see Print; `print` is passed to it);
 a `mood` line for the seed; `.card[data-preset]` cards each holding a
 canvas for a thumbnail; `.tab[data-tab]` buttons switching `presetsBody`
 and `panelBody`; `panel` with `panelHead` and `panelToggle`; and a `title`
 overlay that fades on first touch. Anything missing is skipped. It also
 reads the query string, so `?preset=talavera` or
 `?seed=4242&repeat=rotate&pal=talavera&motif=rosette&density=5&age=1` is a
-shareable wall. Copy the markup from either of the two pages above.
+shareable wall. `document` is where to look for the elements, for a
+panel that lives somewhere other than the page. Copy the markup from
+any of the wall pages above.
 
 **`createViewer(canvas, { paint, scale, minZoom, maxZoom, margin })`**
 is what a wall is built on, and what any other world can be. `paint(g,
@@ -143,7 +181,12 @@ the window, pans on drag, zooms on pinch or wheel, and calls
 that much larger than the window and only blits while you drag, which is
 what a slow paint wants. `viewer.state` has `scale`, `panX` and `panY`;
 add your own fields to it. Call `viewer.repaint()` when the world
-changes and `viewer.moved()` when only the pan did.
+changes and `viewer.moved()` when only the pan did. `viewer.zoomAt(x,
+y, factor)` zooms about a point and `viewer.resize()` refits the
+window. Set `onChange(kind)` to hear `'zoom'`, `onInteract()` for the
+first touch and `onZoom()` for the end of a zoom. `viewer.margin` can
+be changed while it runs: a page that animates sets it to 0 so each
+frame paints the window alone.
 
 **`mountChrome(viewer, spec)`** wires the same chrome around any viewer:
 the panel, the tabs, the preset cards, the title that fades, the save
@@ -156,8 +199,13 @@ id by default), `q` its name in the query string (the key by default),
 when the query string sets it, and `change(value)` is what to do after.
 Then `newId` and `onNew` for the button that starts over, `mood(state)`
 for the line under it, `query(q)` for anything else in the query string,
-`fileName` and `suffix(state)` for the saved png, and `ready()` once
-everything is applied. Alicatado is the worked example.
+`fileName` and `suffix(state)` for the saved png, `order(state)` (a
+promise of a blob) for an `#order` button, `document` for where the
+elements are, and `ready()` once everything is applied. It returns
+`{ sync, dismissTitle, markPreset }`: call `sync()` after changing the
+state yourself, and `markPreset('')` when something the chrome doesn't
+know about (a text box, say) has left the preset behind. Alicatado is
+the worked example; Tartan and Hitomezashi show a text input beside it.
 
 **`azulejeria.css`** styles that markup. Colour it with the custom
 properties at the top of the file: `--az-bg`, `--az-title`,
@@ -200,8 +248,17 @@ uses it for the frame of a street plaque. `mitreCorner(strip)` is the
 square alternative: the strip cut on the diagonal and laid both ways,
 as a run of border tiles is mitred at forty-five degrees.
 
+**The small things** every page ends up wanting: `mulberry32(seed)`,
+the seeded rng everything here draws from; `hash2(i, j)`, an integer
+from a grid position, for seeding a tile or a stitch by where it is;
+`wobble(rng)`, the brush's slow drift as a function of 0 to 1;
+`hexA(hex, alpha)`, a hex colour as an rgba string; `colourOf(el, pal)`,
+an element's role as a colour; and `ageTile(ctx, rng, s, pal)`, what
+age does to one glazed tile, for a material that wants the default
+under its own.
+
 **The lower level** is there if you want it: `makeDesign(seed, density,
-bands, bold, motif)`, `paintDesign(g, els, pal, hand, lw, seed, painters, material, brush)`,
+bands, bold, motif, state)`, `paintDesign(g, els, pal, hand, lw, seed, painters, material, brush)`,
 `makeTile(opts, size, pixelRatio, seed)`, `tileOpts(cfg, state)` and
 `paintThumb(cfg, preset, g, size, pixelRatio)`.
 
@@ -381,6 +438,8 @@ stroke drawn on the dimmed side is reflected over. The wall repaints
 while the pen moves. Cmd or Ctrl Z undoes. **`settle(stroke)`**,
 **`simplify(pts, eps)`** and **`smooth(pts, closed, times)`** are what
 the pad does to a raw stroke, exported for a page with its own input.
+`KINDS` and `MAX_POINTS` (96, the most points a stroke keeps) are the
+encoding's limits.
 
 ## Print
 
@@ -448,7 +507,7 @@ so write your own. **`lifted(draft, i, j)`** is the rule and
 colour codes (K R G B Y W N P O T A M C, with L or D in front for light
 and dark, or `#rrggbb`) and counts, slashes at the pivots allowed; the
 sett turns back at both ends unless it has `...` in it.
-**`threadsOf(sett)`** is one repeat, a code per thread, and
+**`DRAFT_NAMES`** lists the drafts. **`threadsOf(sett)`** is one repeat, a code per thread, and
 **`writeSett(sett)`** writes it back as a threadcount.
 **`dyeOf(code, dye)`** is the colour in a dye lot (**`DYES`**: `modern`,
 `ancient`, `weathered`, or your own map). **`weavePixels(data, w, h,

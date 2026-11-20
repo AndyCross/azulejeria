@@ -1,7 +1,7 @@
 {
   "name": "azulejeria",
   "version": "2.7.0",
-  "description": "Tin-glazed tiles painted by rule. A seeded canvas engine for Spanish azulejo walls: a diagonal-symmetric design, brushwork that drifts, washes that pool, and four ways to repeat the tile.",
+  "description": "Pattern by rule, painted to look like a material. A seeded canvas engine that began with Spanish azulejo walls: tiles with a drifting brush, the seventeen wallpaper groups, a tile cutter, interlace, a hand-drawn tile, cast shadows and a loom.",
   "keywords": ["canvas", "generative", "wallpaper-groups", "symmetry", "tiles", "azulejo", "mudejar", "sevilla", "pattern", "procedural", "art", "wallpaper", "interlace", "knotwork", "celtic", "mosaic", "voronoi", "trencadis", "drawing", "print", "shadow", "weaving", "tartan", "loom"],
   "license": "MIT",
   "author": "Andy Cross",
