@@ -22,6 +22,7 @@ not glazed, a material.
 | `azulejeria` | The tile wall, the viewer it is built on, the panel and page chrome, the brush and its geometry, corner tiles for borders, one tile at print size | A wall in forty lines, The parts, Print |
 | `azulejeria/pieces` | The cutter: a polygon inset, shifted, turned and bevelled, and a Voronoi for things that are broken | Pieces |
 | `azulejeria/groups` | The seventeen wallpaper groups as a way to lay any tile | Groups |
+| `azulejeria/friezes` | The seven frieze groups, for a border, and a frieze on squared paper | Friezes |
 | `azulejeria/knots` | Interlace on a grid: over and under by parity, breaks, cuts and beasts | Knots |
 | `azulejeria/draw` | A tile drawn by hand, one eighth of it, carried in a string | Draw |
 | `azulejeria/shadow` | A sun that goes round and the shadows it casts | Shadow |
@@ -30,8 +31,8 @@ not glazed, a material.
 | `azulejeria/azulejeria.css` | The styles for the panel, the cards, the title and the pad | The parts |
 
 Each module stands alone except `draw`, which paints with the wall's
-brush. `knots`, `groups`, `pieces`, `shadow`, `loom` and `knit` draw on any
-2D context.
+brush. `knots`, `groups`, `friezes`, `pieces`, `shadow`, `loom` and `knit`
+draw on any 2D context.
 
 ## Built on it
 
@@ -386,6 +387,13 @@ the fill style for the gap cut either side of an over strand, `split`
 puts a line down the middle of the ribbon, `bends` is `'round'`,
 `'corners'` (pointed where a strand turns in a corner of the rim) or
 `'pointed'` (every bounce off the rim), and `heads` draws the beasts.
+**`curvedStrand(knot, strand, place, hug)`** is another strand for the
+same knot, with no over and under: it goes round the squares it turns
+in, as a line drawn round dots does, drawn in to `hug` of the way from
+the middle of the square to the break (0.72). It comes back as cubics,
+`[from, control, control, to]`, so a page can walk along it, and
+`strandPath(knot, strand, null, 'curved', place, hug)` is the same thing
+as a `Path2D`.
 A beast's head is traced from a drawing of an Insular hound's head
 (`src/head.js`): it turns off its strand on a narrower neck (`neck`,
 0.55 of the ribbon) and lies along the cut facing the other end, which
@@ -518,6 +526,30 @@ from end `i0` and pick `j0`, and needs no document;
 **`clothCanvas(...)`** is the same as a canvas to draw scaled up, and
 **`threadTile(draft, t)`** is the threads' own shading, one repeat at
 `t` pixels a thread, to lay over it.
+
+## Friezes
+
+`azulejeria/friezes` is the border's answer to the seventeen: a pattern
+that repeats along a line and nowhere else has one of seven symmetry
+groups. Each is how many domains long one repeat is, how many high the
+strip is, and the copies that lay the domain out in one repeat.
+
+```js
+import { FRIEZES, layFrieze, friezeCells } from 'azulejeria/friezes';
+
+const { copies, length, height } = layFrieze('p2mg', 3, 1);   // a domain 3 wide and 1 high
+for (const M of copies) { g.save(); g.transform(...M); drawMotif(g); g.restore(); }   // one repeat, `length` long
+```
+
+**`FRIEZES`** has `p1`, `p11g`, `p1m1`, `p2`, `p2mg`, `p11m` and `p2mm`,
+each with `period`, `rows`, a `note` and `step`, Conway's name for it
+(hop, step, sidle, spinning hop, spinning sidle, jump, spinning jump).
+The domain has its corner at (0, 0), x along the strip and y down.
+**`friezeCells(name, w, h, on)`** is a frieze on squared paper: the
+domain is `w` squares by `h`, `on(i, j)` says what is in each, and one
+repeat comes back as `{ W, H, cells }`. It needs no document, and
+`test/friezes.mjs` checks that every group covers its repeat once and
+has the symmetries of its name and no others.
 
 ## Knit
 

@@ -173,8 +173,18 @@ export function buildKnot(o) {
 // 'round' leaves it so; 'corners' points the strand where it turns in a
 // convex corner of the rim, as the scribes did; 'pointed' also points
 // every bounce off the rim.
-export function strandPath(knot, s, P, bends, place) {
+// 'curved' is another strand altogether, curvedStrand below, which
+// goes round the squares; it has no over and under to relay.
+export function strandPath(knot, s, P, bends, place, hug) {
   const pts = s.pts, n = pts.length, p = new Path2D();
+  if (bends === 'curved') {
+    curvedStrand(knot, s, place, hug).forEach(([a, c1, c2, b], k) => {
+      if (!k) p.moveTo(a[0], a[1]);
+      p.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], b[0], b[1]);
+    });
+    if (!s.open) p.closePath();
+    return p;
+  }
   const at = k => P[(k + n) % n];
   const convex = (A, B) => {
     if ((A.x & 1) === (B.x & 1)) return null;
@@ -223,6 +233,39 @@ export function strandPath(knot, s, P, bends, place) {
   }
   if (!s.open) p.closePath();
   return p;
+}
+// A strand that goes round the squares it turns in, as a line drawn
+// round dots does. It passes through every crossing where the crossing
+// is, on the diagonal, and where it turns back off a break it is drawn
+// in toward the middle of the square it is in, to `hug` of the way out
+// from that middle to the break (0.72), and runs along the break there.
+// Two breaks in a row round one square make a quarter of a circle, and
+// three make a loop that crosses its own tail. Returns the strand as
+// cubics, [from, control, control, to] in placed coordinates, so a page
+// can walk along it; strandPath(..., 'curved', place, hug) is the same
+// thing as a Path2D.
+export function curvedStrand(knot, s, place, hug) {
+  const h = hug == null ? 0.72 : hug, pts = s.pts, n = pts.length;
+  const idx = k => (s.open ? Math.max(0, Math.min(n - 1, k)) : ((k % n) + n) % n);
+  const raw = k => { const q = pts[idx(k)]; return place(q.x, q.y); };
+  const at = k => {
+    const q = pts[idx(k)];
+    if (q.kind === 'cross' || q.kind === 'end') return place(q.x, q.y);
+    // the square it turns in: this point and the one before lie on two of its edges
+    const nb = pts[idx(k) > 0 ? idx(k) - 1 : (s.open ? 1 : n - 1)];
+    const cx = (q.x & 1) ? q.x : nb.x, cy = (q.x & 1) ? nb.y : q.y;
+    return place(cx + (q.x - cx) * h, cy + (q.y - cy) * h);
+  };
+  const dir = k => {
+    const a = raw(k - 1), b = raw(k + 1), l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    return [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
+  };
+  const out = [];
+  for (let k = 0; k < (s.open ? n - 1 : n); k++) {
+    const a = at(k), b = at(k + 1), ta = dir(k), tb = dir(k + 1), l = Math.hypot(b[0] - a[0], b[1] - a[1]) * 0.39;
+    out.push([a, [a[0] + ta[0] * l, a[1] + ta[1] * l], [b[0] - tb[0] * l, b[1] - tb[1] * l], b]);
+  }
+  return out;
 }
 // the piece of a strand either side of point k, for relaying a crossing
 function piecePath(P, k) {
