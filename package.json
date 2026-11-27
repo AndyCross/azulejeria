@@ -1,8 +1,8 @@
 {
   "name": "azulejeria",
-  "version": "2.7.0",
-  "description": "Pattern by rule, painted to look like a material. A seeded canvas engine that began with Spanish azulejo walls: tiles with a drifting brush, the seventeen wallpaper groups, a tile cutter, interlace, a hand-drawn tile, cast shadows and a loom.",
-  "keywords": ["canvas", "generative", "wallpaper-groups", "symmetry", "tiles", "azulejo", "mudejar", "sevilla", "pattern", "procedural", "art", "wallpaper", "interlace", "knotwork", "celtic", "mosaic", "voronoi", "trencadis", "drawing", "print", "shadow", "weaving", "tartan", "loom"],
+  "version": "2.8.0",
+  "description": "Pattern by rule, painted to look like a material. A seeded canvas engine that began with Spanish azulejo walls: tiles with a drifting brush, the seventeen wallpaper groups, a tile cutter, interlace, a hand-drawn tile, cast shadows, a loom and knitting.",
+  "keywords": ["canvas", "generative", "wallpaper-groups", "symmetry", "tiles", "azulejo", "mudejar", "sevilla", "pattern", "procedural", "art", "wallpaper", "interlace", "knotwork", "celtic", "mosaic", "voronoi", "trencadis", "drawing", "print", "shadow", "weaving", "tartan", "loom", "knitting", "fair-isle"],
   "license": "MIT",
   "author": "Andy Cross",
   "homepage": "https://stepinto.dev/art/azulejeria.html",
@@ -18,11 +18,12 @@
     "./draw": "./src/draw.js",
     "./shadow": "./src/shadow.js",
     "./loom": "./src/loom.js",
+    "./knit": "./src/knit.js",
     "./azulejeria.css": "./src/azulejeria.css"
   },
   "files": ["src", "test", "README.md", "LICENSE"],
   "sideEffects": false,
   "scripts": {
-    "test": "node --check src/azulejeria.js && node --check src/knots.js && node --check src/head.js && node --check src/pieces.js && node --check src/groups.js && node --check src/draw.js && node --check src/shadow.js && node --check src/loom.js && node test/groups.mjs && node test/draw.mjs && node test/loom.mjs"
+    "test": "node --check src/azulejeria.js && node --check src/knots.js && node --check src/head.js && node --check src/pieces.js && node --check src/groups.js && node --check src/draw.js && node --check src/shadow.js && node --check src/loom.js && node --check src/knit.js && node test/groups.mjs && node test/draw.mjs && node test/loom.mjs && node test/knit.mjs"
   }
 }

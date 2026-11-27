@@ -26,11 +26,12 @@ not glazed, a material.
 | `azulejeria/draw` | A tile drawn by hand, one eighth of it, carried in a string | Draw |
 | `azulejeria/shadow` | A sun that goes round and the shadows it casts | Shadow |
 | `azulejeria/loom` | Weaving drafts, setts and the cloth they make | Loom |
+| `azulejeria/knit` | Charted knitting: bands, Fair Isle's two rules, and every stitch as its V | Knit |
 | `azulejeria/azulejeria.css` | The styles for the panel, the cards, the title and the pad | The parts |
 
 Each module stands alone except `draw`, which paints with the wall's
-brush. `knots`, `groups`, `pieces`, `shadow` and `loom` draw on any 2D
-context.
+brush. `knots`, `groups`, `pieces`, `shadow`, `loom` and `knit` draw on any
+2D context.
 
 ## Built on it
 
@@ -54,6 +55,7 @@ Other worlds on the viewer (`createViewer`):
 [Rejería](https://stepinto.dev/art/rejeria.html) (wrought iron and its shadow on whitewash),
 [Jali](https://stepinto.dev/art/jali.html) (a pierced stone screen and the light it lets onto the floor),
 [Tartan](https://stepinto.dev/art/tartan.html) (type a sett, get the cloth),
+[Fair Isle](https://stepinto.dev/art/fairisle.html) (stranded knitting, written as its bands from the top down),
 [Hitomezashi](https://stepinto.dev/art/hitomezashi.html) (two words stitched as rows and columns),
 [Azulejos de letras](https://stepinto.dev/art/letras.html) (a street-sign typeface, with borders that turn the corner),
 [Mantón de Manila](https://stepinto.dev/art/manton.html) (embroidered silk),
@@ -516,6 +518,59 @@ from end `i0` and pick `j0`, and needs no document;
 **`clothCanvas(...)`** is the same as a canvas to draw scaled up, and
 **`threadTile(draft, t)`** is the threads' own shading, one repeat at
 `t` pixels a thread, to lay over it.
+
+## Knit
+
+`azulejeria/knit` is colourwork by rule. A chart is a list of strings,
+a character a stitch: `.` is the ground, `X` the pattern, and any other
+character a further colour. A band is a chart with its colours, and a
+stack is bands from the top down. Fair Isle adds two rules, and the
+module can check both: a row has two colours and no more, and the
+colour not in use may not float more than about seven stitches.
+
+```js
+import { fairIsle, paintKnit, ROW } from 'azulejeria/knit';
+
+const cloth = fairIsle('oxo13 zig star11 seed', 'madder', 1);   // bands from the top down
+g.setTransform(12, 0, 0, 12, 0, 0);                             // a stitch is one unit wide, ROW high
+paintKnit(g, cloth, 0, 0, 80, 60, 12);                          // 80 stitches by 60 rows, 12 px a stitch
+```
+
+**`chartOf(rows, gap)`** makes a chart, and **`byRule(n, fn)`** one
+with the square's symmetries from `fn(a, b)`, the distance from the
+middle each way. **`PEERIES`** are the small bands (`seed`, `dots`,
+`check`, `zig`, `wave`, `cross`, `links`, `lozenge`, `hearts`, `bars`)
+and **`BORDERS`** the large ones, each a function of the half-width
+(`oxo`, `star`, `diamond`, `flake`, `tile`), filled in their corners
+until **`floatsOf(chart)`** reports no float over seven.
+**`ruleMotif(seed, n, limit)`** is a large band nobody charted.
+**`FIGURES`** are the season's (`reindeer`, `tree`, `pudding`,
+`snowman`, `gift`, `cane`, `bauble`, `heart`), in more colours than a
+row should have: `X` is the band's own colour and `k w r g y b` are
+inks the page names. **`textChart(text)`** knits a word in a
+five-by-seven alphabet, and **`knittable(text)`** is what of it can be
+knitted.
+
+**`band(chart, colours, opts)`** gives a chart its colours, one for
+each character, each a colour or a list with one for each row
+(**`shadeRows(h, shades)`** makes the list that shades to the middle
+row and back). `opts` are `repeat` (false knits it once), `scale`,
+`phase` and `gap`. **`plain(rows, colour)`** is rows of nothing.
+**`stackOf(bands, base, repeat)`** stacks them, and
+**`stitchAt(stack, i, j)`** is the colour of one stitch.
+**`fairIsle(text, wool, seed, opts)`** is the stack for a cloth
+written as its bands, in one of the **`WOOLS`** (`shetland`, `madder`,
+`sea`, `heather`, `yule`, `stepinto`) or your own; **`parseBands`**,
+**`writeBands`** and **`randomBands(seed)`** read, write and invent the
+text.
+
+**`knitPixels(data, w, h, i0, j0, stack)`** fills RGBA pixels, one a
+stitch, and needs no document. **`paintKnit(g, stack, i0, j0, nw, nh,
+px)`** knits into the context's own transform, each stitch drawn as a
+V so that a change of colour has a zigzag edge, with
+**`stitchTile(px)`** laid over for the roundness of the yarn.
+**`paintRib(g, colour, x, y, w, h, px)`** is ribbing for a welt or a
+cuff, and **`fuzzTile(seed, size)`** the halo of the wool.
 
 ## Licence
 

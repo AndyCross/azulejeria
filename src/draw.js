@@ -328,7 +328,9 @@ export function mountPad(wall, opts) {
     const pal = wall.palettes[state.pal];
     if (pal !== palSeen) { palSeen = pal; swatches(pal); }
     const W = canvas.clientWidth || 200, DPR = Math.min(window.devicePixelRatio || 1, 2);
-    if (canvas.width !== Math.round(W * DPR)) { canvas.width = canvas.height = Math.round(W * DPR); }
+    const px = Math.round(W * DPR);
+    // both, because a canvas starts at 300 by 150: a 150px pad at 2x already has the right width
+    if (canvas.width !== px || canvas.height !== px) { canvas.width = canvas.height = px; }
     const g = canvas.getContext('2d');
     const S = W - 2 * M;
     g.setTransform(DPR, 0, 0, DPR, 0, 0);
